@@ -1,0 +1,377 @@
+/* ============================================================================
+   Firstlight — global stylesheet (the rev4 board UI).
+
+   THE BOARD IS THE BACKGROUND: a crisp perspective chessboard (dark #0E0A07 /
+   light #4A3A26 squares, gold grid lines at 25%, gold trim edge) fixed behind
+   the whole page; only the lens inside a pane blurs what is directly behind
+   it, and only the far horizon fades. Pieces are lit like jewellery — king on
+   his plinth with the thin gold halo + sharp mid-layer pieces on screen one.
+   Text contrast = text-shadow + one soft veil under 25% (no dark bars).
+   Mobile: king above the headline, per-stock 4x2 cards, >=44px targets, <=3
+   backdrop-filter layers. Reduced motion = static position. No red, no
+   green, no horizontal scroll. Mirrors ui-mocks/hero-v2.html rev4 exactly.
+   ========================================================================== */
+
+  :root{
+    --page-0:#0F0D0D; --page-1:#121010;
+    --surface-0:#1A1919; --surface-1:#2D2C2C;
+    --depth-0:#40312A; --depth-1:#55453C;
+    --bronze:#9B8678; --gold:#D4B07A;
+    --text:#F2EFE8;
+    --hairline:rgba(255,255,255,.14);
+    --serif:"Fraunces",ui-serif,Georgia,"Times New Roman",serif;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sqD:#0E0A07; --sqL:#4A3A26;                  /* the board's squares */
+    --tshadow:0 1px 2px rgba(12,9,7,.92),0 2px 8px rgba(12,9,7,.6),0 0 18px rgba(12,9,7,.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  html,body{background:var(--page-0)}
+  body{
+    font-family:var(--sans); color:var(--text);
+    min-height:100vh; overflow-x:hidden;           /* never a horizontal page scroll */
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ══════════════ 1 · BACKGROUND STAGE — pieces on a glossy floor ══════════════ */
+  .bg{position:fixed;inset:0;z-index:-1;overflow:hidden;
+      background:radial-gradient(130% 100% at 50% 0%,#171311 0%,var(--page-0) 62%)}
+  .bg__glow{position:absolute;width:70vw;height:70vw;left:-18vw;top:-22vh;border-radius:50%;
+    background:radial-gradient(circle,rgba(85,69,60,.4),rgba(85,69,60,0) 65%);
+    animation:drift1 52s ease-in-out infinite alternate;pointer-events:none}
+  @keyframes drift1{to{transform:translate3d(4vw,3vh,0)}}
+
+  /* THE CHESSBOARD — a real board, fully crisp. A perspective plane, fixed
+     behind the whole page; squares clearly countable from the hero downward.
+     NO blur filter ever touches the board layer — only the lens inside a
+     pane softens what is directly behind it. Dark #0E0A07 / light #4A3A26
+     squares, thin gold grid lines at 25%, gold trim edge; only the far
+     horizon fades, the nearest 70% stays at full opacity. */
+  .boardplane{position:absolute;inset:0;pointer-events:none}
+  .boardplane svg{display:block;width:100%;height:100%}
+  .bg__vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(125% 105% at 50% 22%,rgba(15,13,13,0) 62%,rgba(8,7,6,.38) 100%)}
+
+  /* depth layers: far (small, dim, soft) and mid (sharp) — behind the glass */
+  .layer{position:absolute;inset:0;pointer-events:none;will-change:transform}
+  .piece{position:absolute;will-change:transform,opacity}
+  .piece img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2}
+  .piece svg{display:block;width:100%;height:auto;filter:drop-shadow(0 16px 22px rgba(0,0,0,.5))}
+
+  /* far layer — small, dim, soft */
+  .p-far-pawn1{left:11%;top:36%;width:min(7vw,72px);opacity:.34;filter:blur(1px)}
+  .p-far-pawn2{left:83%;top:30%;width:min(5.5vw,58px);opacity:.28;filter:blur(1.2px)}
+  .p-far-bishop{left:31%;top:33%;width:min(8vw,84px);opacity:.30;filter:blur(1.4px)}
+  .p-far-rook{left:91%;top:42%;width:min(6.5vw,70px);opacity:.26;filter:blur(1.2px)}
+  /* mid layer — SHARP, lit like jewellery, standing on the board squares */
+  .p-mid-queen{left:85%;top:40%;width:min(13vw,152px);opacity:.95}
+  .p-mid-bishop{left:10%;top:46%;width:min(11.5vw,136px);opacity:.92}
+  .p-mid-knight{left:23%;top:65%;width:min(11vw,130px);opacity:.85}
+  .p-mid-pawn{left:73%;top:69%;width:min(9.5vw,112px);opacity:.95}
+  .p-mid-rook{left:56%;top:78%;width:min(10vw,118px);opacity:.9}
+
+  /* the king — hero of the first screen, on his plinth, thin gold halo behind */
+  .stage{position:absolute;left:70%;bottom:5vh;width:min(44vw,436px);
+    transform:translateX(-50%);will-change:transform,opacity}
+  .stage__float{position:relative;animation:float 7s ease-in-out infinite}
+  @keyframes float{50%{transform:translateY(-6px)}}    /* upright — translation only */
+  .stage__halo{position:absolute;left:50%;bottom:31%;width:124%;aspect-ratio:1.02;
+    transform:translateX(-50%);border-radius:50%;z-index:1;
+    border:2.5px solid rgba(212,176,122,.68);
+    box-shadow:0 0 40px rgba(212,176,122,.3),inset 0 0 34px rgba(212,176,122,.2);opacity:1}
+  .stage__beam{position:absolute;left:50%;bottom:34%;width:150%;height:95vh;
+    transform:translateX(-50%);pointer-events:none;z-index:0}
+  .stage__img{position:absolute;left:8%;bottom:20%;width:84%;z-index:4;pointer-events:none}
+  .stage__plinth{display:block;width:100%;height:auto;position:relative;z-index:2}
+  .stage__king{position:absolute;left:50%;bottom:27%;width:44%;
+    transform:translateX(-50%);z-index:3;filter:drop-shadow(0 18px 30px rgba(0,0,0,.5))}
+
+  /* ══════════════ 2 · NEAR LAYER — above the glass, cropped, soft-focus ══════════════ */
+  .near{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden;will-change:transform}
+  .near .piece svg{filter:blur(7px) drop-shadow(0 26px 40px rgba(0,0,0,.55))}
+  .p-near-knight{left:-15%;top:47%;width:min(46vw,432px);opacity:.95}
+  .p-near-rook{left:79%;top:18%;width:min(34vw,330px);opacity:.9}
+
+  /* ══════════════ 3 · THICK GLASS — outer pane + inner lens + glare ══════════════ */
+  .glass{position:relative;
+    background:rgba(255,255,255,.03);                 /* 3% white — pieces show through */
+    -webkit-backdrop-filter:blur(6px);
+    backdrop-filter:blur(6px);
+    border:1px solid var(--hairline);border-radius:24px;
+    box-shadow:0 24px 48px rgba(0,0,0,.42),
+               inset 0 1px 0 rgba(255,255,255,.10),
+               inset -1px -2px 8px rgba(0,0,0,.22)}   /* darker bottom-right inner edge */
+  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
+    background:linear-gradient(135deg,rgba(255,255,255,.32),rgba(255,255,255,.07) 30%,rgba(255,255,255,0) 55%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+  .glass--nav{background:rgba(255,255,255,.04);border-radius:999px}
+  .pane{border-radius:28px}
+  .pane__lens{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+    -webkit-backdrop-filter:blur(17px) brightness(1.05);
+    backdrop-filter:blur(17px) brightness(1.05);
+    -webkit-mask-image:radial-gradient(115% 90% at 50% 44%,#000 26%,rgba(0,0,0,.5) 60%,transparent 92%);
+    mask-image:radial-gradient(115% 90% at 50% 44%,#000 26%,rgba(0,0,0,.5) 60%,transparent 92%)}
+  .pane__glare{position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    overflow:hidden;z-index:0}
+  .pane__glare::before{content:"";position:absolute;top:-60%;left:64%;width:26%;height:220%;
+    transform:rotate(24deg);
+    background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.05) 50%,rgba(255,255,255,0))}
+  .pane>:not(.pane__lens):not(.pane__glare):not(.pane__veil){position:relative;z-index:1}
+  /* the soft veil — ONE gradient under 25% behind pane text; the per-line
+     dark bars are gone, contrast comes from text-shadow (>=4.5:1) */
+  .pane__veil{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
+    background:radial-gradient(125% 115% at 32% 40%,rgba(10,8,6,.24),rgba(10,8,6,0) 72%)}
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .glass{background:rgba(22,19,16,.9)}
+    .pane__lens{display:none}
+  }
+
+  .kicker,.headline,.lede,.cta,.callout__label,.callout__value,.callout__sub,
+  .board__title,.board__session,.chip,.hd,.nm,.state,.ev,.evidence__name,
+  .evidence__block,.evidence__rule,.board__note,.honesty p,.honesty li,.nav__word,
+  .nav__links a,.nav__tag,.scene__chip,.sq .lb,.sq .tm,.sq .g,.pill,.published,
+  .step__label,.step__text,.seclabel,.cred{
+    text-shadow:var(--tshadow)}
+  /* lighter bronze for SMALL text now that the bars are gone — #BCA895 on
+     the light square #4A3A26 is >=4.5:1 even before shadow and veil */
+  .kicker,.callout__label,.nav__links a,.nav__tag,.chip,.hd,.seclabel,
+  .step__label,.board__session,.evidence__block,.state--nd,.views button,
+  .sq[data-state="n"] .lb,.sq[data-state="n"] .tm,
+  .sq[data-state="d"] .lb,.sq[data-state="d"] .tm{color:#BCA895}
+
+  /* ══════════════ 4 · NAV ══════════════ */
+  .nav{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10;
+    width:min(1180px,calc(100vw - 24px));
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:12px 22px}
+  .nav__word{font-size:12px;letter-spacing:.24em;font-weight:600;color:var(--text)}
+  .nav__word b{color:var(--gold);font-weight:600}
+  .nav__links{display:flex;gap:22px}
+  .nav__links a{font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--bronze);text-decoration:none;transition:color .2s}
+  .nav__links a:hover,.nav__links a:focus-visible{color:var(--text)}
+  .nav__tag{font-size:10px;letter-spacing:.18em;color:var(--bronze);
+    border:1px solid rgba(155,134,120,.35);border-radius:999px;padding:5px 10px;white-space:nowrap}
+  :is(a,button):focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+  /* ══════════════ 5 · HERO PANE ══════════════ */
+  .wrap{width:min(1180px,calc(100vw - 24px));margin:0 auto}
+  .hero{padding:104px 0 7vh}
+  .hero__grid{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);min-height:74vh}
+  .hero__pane{padding:clamp(26px,3.4vw,46px);display:flex;flex-direction:column;gap:22px;
+    justify-content:center;align-self:stretch;margin:clamp(14px,2vw,36px) 0}
+  .kicker{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--bronze);align-self:flex-start}
+  .headline{font-family:var(--serif);font-weight:300;text-transform:uppercase;
+    letter-spacing:.055em;line-height:1.04;font-size:clamp(38px,5.8vw,70px);color:var(--text)}
+  .lede{font-size:15.5px;line-height:1.6;color:rgba(242,239,232,.84);max-width:44ch}
+  .cta{align-self:flex-start;display:inline-block;
+    font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);
+    border:1px solid rgba(212,176,122,.55);border-radius:999px;padding:13px 26px;
+    text-decoration:none;transition:background .25s,box-shadow .25s}
+  .cta:hover,.cta:focus-visible{background:rgba(212,176,122,.09);box-shadow:0 0 24px rgba(212,176,122,.15)}
+  .hr{height:1px;background:linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,0));border:0}
+  .callouts{display:flex;flex-direction:column;gap:16px}
+  .callout{display:grid;grid-template-columns:24px 1fr;gap:12px;align-items:start;
+    padding:13px 15px;border-radius:14px;border:1px solid rgba(255,255,255,.09);
+    background:rgba(255,255,255,.028)}
+  .callout svg{width:19px;height:19px;stroke:var(--bronze);fill:none;
+    stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin-top:2px;
+    filter:drop-shadow(0 1px 2px rgba(12,9,7,.8))}
+  .callout__label{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--bronze);align-self:flex-start}
+  .callout__value{font-family:var(--mono);font-size:24px;color:var(--text);margin:3px 0 4px;align-self:flex-start}
+  .callout__sub{font-size:12px;line-height:1.5;color:rgba(242,239,232,.68)}
+  .pill{display:inline-block;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+    border:1px solid rgba(155,134,120,.45);border-radius:999px;padding:2px 8px;
+    color:var(--bronze);vertical-align:1px;margin-right:6px}
+  .callout__n{color:rgba(242,239,232,.5);font-size:11px}
+  .published{font-size:12px;line-height:1.6;color:rgba(242,239,232,.66);align-self:flex-start}
+  .hero__scene{position:relative;min-height:340px}
+  .scene__chip{position:absolute;right:18px;bottom:16px;font-size:9.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--bronze);border:1px solid rgba(255,255,255,.12);
+    border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.03)}
+
+  /* ══════════════ 6 · BOARD PANE ══════════════ */
+  .board{padding:9vh 0 4vh}
+  .board__panel{padding:clamp(18px,3vw,38px)}
+  .board__head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:6px}
+  .board__title{font-family:var(--serif);font-weight:300;font-size:clamp(26px,3vw,38px);
+    letter-spacing:.03em;align-self:flex-start}
+  .board__session{font-size:12.5px;color:rgba(242,239,232,.68);align-self:flex-start}
+  .board__pills{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .views{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--hairline);
+    border-radius:999px;background:rgba(255,255,255,.03)}
+  .views button{appearance:none;border:0;background:transparent;color:var(--bronze);
+    font:600 11px/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;
+    padding:0 18px;height:44px;border-radius:999px;cursor:pointer;
+    text-shadow:var(--tshadow);transition:color .2s,background .2s,box-shadow .2s}
+  .views button[aria-pressed="true"]{background:rgba(212,176,122,.16);color:var(--gold);
+    box-shadow:0 0 14px rgba(212,176,122,.15)}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 20px}
+  .chip{display:inline-flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--bronze);border:1px solid rgba(255,255,255,.12);
+    border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.03)}
+  .chip .g{font-size:12px;line-height:1}
+  .chip--a{border-color:rgba(212,176,122,.55);color:var(--gold);
+    box-shadow:0 0 14px rgba(212,176,122,.12)}
+  .chip--d{color:rgba(155,134,120,.9)}
+  .chip--nd{border-style:dashed}
+  .chip--live{border-color:rgba(212,176,122,.7);color:var(--gold);
+    background:rgba(212,176,122,.10);box-shadow:0 0 16px rgba(212,176,122,.22)}
+  .chip--live .dotp{width:6px;height:6px;border-radius:50%;background:var(--gold);
+    box-shadow:0 0 8px rgba(212,176,122,.8)}
+  .board__scroll{overflow-x:auto;padding-bottom:6px}
+  .grid{display:grid;grid-template-columns:58px repeat(8,var(--sqw,56px));gap:6px;min-width:max-content}
+  .row{display:contents}
+  .hd{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--bronze);
+    text-align:center;align-self:end;padding:2px 4px 4px}
+  .nm{font-family:var(--mono);font-size:12.5px;color:var(--text);align-self:center;
+    position:sticky;left:0;background:rgba(21,19,18,.85);padding:6px 8px 6px 2px;
+    border-radius:8px;z-index:2;text-shadow:var(--tshadow)}
+  .hd--corner{position:sticky;left:0;background:transparent;z-index:2;text-align:left;padding-left:2px}
+  .sq{--tint:rgba(255,255,255,0);width:var(--sqw);height:var(--sqw);border-radius:10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    border:1px solid transparent;cursor:pointer;color:var(--bronze);
+    -webkit-backdrop-filter:none;backdrop-filter:none;
+    background:linear-gradient(var(--tint),var(--tint));
+    transition:opacity .5s,transform .3s,box-shadow .25s}
+  .sq .g{font-size:15px;line-height:1}
+  .sq .lb{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase}
+  .sq .tm{display:none;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:rgba(242,239,232,.55)}
+  .sq.alt{--tint:rgba(255,255,255,.025)}
+  .sq[data-state="a"]{
+    background:radial-gradient(circle at 50% 34%,rgba(212,176,122,.30),rgba(212,176,122,.07) 68%,var(--tint));
+    border-color:rgba(212,176,122,.55);color:var(--gold);
+    box-shadow:0 0 18px rgba(212,176,122,.18)}
+  .sq[data-state="t"]{border-color:rgba(255,255,255,.20);color:#CFC6B8;
+    background:linear-gradient(var(--tint),var(--tint))}
+  .sq[data-state="d"]{border-color:rgba(255,255,255,.07);color:var(--bronze);
+    background:linear-gradient(var(--tint),var(--tint)),rgba(255,255,255,.03)}
+  .sq[data-state="n"]{border-color:rgba(255,255,255,.14);border-style:dashed;color:rgba(155,134,120,.9);
+    background:linear-gradient(var(--tint),var(--tint))}
+  .sq:hover{transform:translateY(-2px)}
+  .sq.sel{outline:2px solid var(--gold);outline-offset:2px}
+  /* F · board reveal — squares light one at a time, chess-clock style */
+  .sq{opacity:0;transform:translateY(6px) scale(.96)}
+  .sq.lit{opacity:1;transform:none}
+  .sq.glow{box-shadow:0 0 22px rgba(212,176,122,.38),0 0 18px rgba(212,176,122,.2)}
+  .evidence{display:none;margin-top:22px;border-radius:16px;border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.025);padding:18px 20px;font-size:13px;line-height:1.7}
+  .evidence.open{display:block;animation:evin .35s cubic-bezier(.2,.6,.2,1)}
+  @keyframes evin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .evidence__head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:10px}
+  .evidence__name{font-family:var(--mono);font-size:17px}
+  .evidence__block{color:rgba(242,239,232,.68);font-size:12px}
+  .state{font-size:10px;letter-spacing:.16em;border-radius:999px;padding:4px 11px;border:1px solid}
+  .state--a{color:var(--gold);border-color:rgba(212,176,122,.55);box-shadow:0 0 14px rgba(212,176,122,.14)}
+  .state--t{color:#CFC6B8;border-color:rgba(255,255,255,.22)}
+  .state--d{color:var(--bronze);border-color:rgba(255,255,255,.08)}
+  .state--nd{color:var(--bronze);border-color:rgba(255,255,255,.16);border-style:dashed}
+  .ev{font-family:var(--mono);color:var(--text)}
+  .ev small{font-family:var(--sans);font-size:11px;color:rgba(242,239,232,.55)}
+  .evidence__rule{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--bronze);
+    border-top:1px solid rgba(255,255,255,.08);padding-top:10px;word-spacing:.12em}
+  .board__note{margin-top:16px;font-size:11.5px;line-height:1.7;color:rgba(242,239,232,.55)}
+  .board__note b{color:rgba(242,239,232,.8)}
+
+  /* ══════════════ 7 · HOW-IT-WORKS PANE ══════════════ */
+  .how{padding:5vh 0 4vh}
+  .how__panel{padding:clamp(20px,3vw,38px)}
+  .seclabel{display:flex;align-items:center;gap:14px;font-size:10.5px;letter-spacing:.26em;
+    text-transform:uppercase;color:var(--bronze);margin-bottom:18px}
+  .seclabel::after{content:"";height:1px;flex:1;
+    background:linear-gradient(90deg,rgba(255,255,255,.14),rgba(255,255,255,0))}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(14px,2vw,26px)}
+  .step{border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:18px 18px 20px;
+    background:rgba(255,255,255,.028)}
+  .step__icon{width:30px;height:42px;display:block;margin-bottom:12px;
+    filter:drop-shadow(0 6px 10px rgba(0,0,0,.5))}
+  .step__label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--gold)}
+  .step__text{font-size:12.5px;line-height:1.65;color:rgba(242,239,232,.7);margin-top:8px}
+
+  /* ══════════════ 8 · HONESTY PANE ══════════════ */
+  .honesty{padding:5vh 0 4vh}
+  .honesty__panel{padding:clamp(20px,3vw,38px)}
+  .honesty ul{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+  .honesty li{font-size:12.5px;line-height:1.65;color:rgba(242,239,232,.7);
+    padding-left:18px;position:relative;align-self:flex-start}
+  .honesty li::before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:7px;
+    border:1px solid rgba(212,176,122,.55);transform:rotate(45deg)}
+  .honesty p{font-size:11.5px;line-height:1.75;color:rgba(242,239,232,.6)}
+  .mono{font-family:var(--mono)}
+  .cred{margin:26px 0 8px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--bronze);text-align:center}
+
+  /* ══════════════ 9 · REVEAL — panes scale .95→1 and rise ══════════════ */
+  .reveal{opacity:0;transform:translateY(24px) scale(.95);
+    transition:opacity .55s cubic-bezier(.2,.6,.2,1),transform .55s cubic-bezier(.2,.6,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .callouts .callout:nth-child(2){transition-delay:.09s}
+  .callouts .callout:nth-child(3){transition-delay:.18s}
+
+  /* ══════════════ 10 · TABLET (<=840px) ══════════════ */
+  @media (max-width:840px){
+    :root{--sqw:46px}
+    .nav{padding:11px 16px}
+    .nav__links{display:none}
+    .hero{padding-top:88px}
+    .hero__grid{grid-template-columns:1fr;min-height:0}
+    .hero__scene{min-height:44vh}
+    .stage{left:50%;bottom:15vh;width:min(72vw,340px)}
+    .p-mid-queen{left:84%;top:38%}
+    .p-mid-rook{left:54%;top:76%}
+    .steps{grid-template-columns:1fr}
+  }
+
+  /* ══════════════ 11 · MOBILE (<640px) — king above headline, 4x2 cards ══════════════ */
+  @media (max-width:639.98px){
+    .hero{padding-top:84px}
+    .hero__grid{display:flex;flex-direction:column}
+    .hero__scene{order:-1;min-height:36vh}       /* the king, above the headline */
+    .stage{left:50%;bottom:auto;top:20vh;width:min(64vw,300px)}
+    .hero__pane{margin:0}
+    .scene__chip{right:12px;bottom:10px}
+    .near .piece svg{filter:blur(4px) drop-shadow(0 20px 30px rgba(0,0,0,.5))}
+    .p-near-knight{left:-30%;top:56%;width:64vw;opacity:.55}
+    .p-near-rook{left:74%;top:12%;width:52vw;opacity:.5}
+    .p-far-pawn1,.p-far-pawn2,.p-mid-knight{display:none}
+    .p-far-bishop{left:24%;top:9%}
+    .p-mid-queen{left:80%;top:28%;width:26vw;opacity:.95}
+    .p-mid-bishop{left:3%;top:44%;width:27vw;opacity:.85}
+    .p-mid-pawn{left:72%;top:66%;width:23vw;opacity:.95}
+    .p-mid-rook{left:40%;top:84%;width:22vw;opacity:.9}
+    /* blur budget: only nav + hero pane + board pane keep backdrop-filter */
+    #how .pane,#honesty .pane{
+      -webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.022)}
+    .pane__lens{-webkit-backdrop-filter:none;backdrop-filter:none;
+      background:radial-gradient(115% 90% at 50% 44%,rgba(255,255,255,.05),rgba(255,255,255,0) 70%)}
+    .board__panel{padding:16px 14px}
+    .board__head{gap:8px 12px}
+    .board__pills{margin-left:0;width:100%}
+    .views{width:100%;justify-content:stretch}
+    .views button{flex:1;padding:0 8px}
+    .board__scroll{overflow:visible;padding-bottom:0}
+    .grid{display:flex;flex-direction:column;gap:12px;min-width:0}
+    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;
+      padding:12px 12px 13px;border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;background:rgba(255,255,255,.022)}
+    .hd{display:none}
+    .nm{position:static;background:transparent;padding:2px 2px 8px;font-size:14px}
+    .sq{width:auto;height:58px;gap:2px}          /* >=44px tap targets */
+    .sq .tm{display:block}
+    .sq .g{font-size:14px}
+    .sq .lb{font-size:7.5px}
+    .evidence{padding:16px 14px}
+    .how__panel,.honesty__panel{padding:18px 16px}
+  }
+
+  /* ══════════════ 12 · REDUCED MOTION — a static position ══════════════ */
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .reveal{opacity:1!important;transform:none!important}
+    .sq{opacity:1!important;transform:none!important}
+    .stage__float{animation:none}
+  }
