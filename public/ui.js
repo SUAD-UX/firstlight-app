@@ -788,9 +788,21 @@ tickerIn && tickerIn.addEventListener("click", (e) => {
   if (board) board.scrollIntoView({ behavior: rm ? "auto" : "smooth" });
 });
 
-/* ─── alerts bell — scoped feature, honestly labelled, not live yet ─── */
+/* ─── alerts bell — live Telegram subscriptions via t.me deep links ─── */
 const bellBtn = document.getElementById("bellBtn");
 const bellPop = document.getElementById("bellPop");
+const bellRow = document.getElementById("bellRow");
+const bellSz = document.getElementById("bellSz");
+function updateBellLinks() {
+  if (!bellRow) return;
+  bellRow.querySelectorAll("a[data-tk]").forEach((a) => {
+    a.href = "https://t.me/FirstlightAlertsBot?start=" + a.dataset.tk + "_" + size;
+  });
+  if (bellSz) {
+    bellSz.textContent = "alerts size: $" + size.toLocaleString("en-US") +
+      " — change it with the size buttons under the board";
+  }
+}
 if (bellBtn && bellPop) {
   const setPop = (open) => {
     bellPop.hidden = !open;
@@ -808,6 +820,7 @@ if (bellBtn && bellPop) {
     if (e.key === "Escape") setPop(false);
   });
 }
+updateBellLinks();
 
 /* ─── fetch (real product: no demo fallback, ever) ─── */
 async function loadBoard() {
@@ -841,6 +854,7 @@ document.querySelectorAll(".sizes button[data-size]").forEach((b) =>
   b.addEventListener("click", () => {
     if (+b.dataset.size === size) return;
     size = +b.dataset.size;
+    updateBellLinks();
     syncToggles(); ev.classList.remove("open"); loadBoard();
   }));
 

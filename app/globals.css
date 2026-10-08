@@ -146,6 +146,12 @@
     background:rgba(22,19,17,.96);box-shadow:0 24px 48px rgba(0,0,0,.5)}
   .bellpop__t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
   .bellpop__x{font-size:12px;line-height:1.65;color:rgba(242,239,232,.75)}
+  .bellpop__row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 10px}
+  .bellpop__tg{display:inline-block;padding:7px 14px;border:1px solid rgba(212,176,122,.38);
+    border-radius:999px;font-size:12px;letter-spacing:.12em;color:var(--gold);
+    text-decoration:none;background:rgba(212,176,122,.07)}
+  .bellpop__tg:hover,.bellpop__tg:focus-visible{background:rgba(212,176,122,.16)}
+  .bellpop__sz{font-size:11px;line-height:1.5;color:rgba(242,239,232,.5)}
   :is(a,button):focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
 
   /* ══════════════ 4b · TICKER STRIP — verdict + cost per name, never prices ══════════════ */
