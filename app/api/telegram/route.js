@@ -23,10 +23,10 @@
 // ============================================================================
 
 import { NextResponse } from "next/server";
-import { rest, restMutate } from "../../../../lib/supabase.js";
-import { sendMessage, answerCallbackQuery } from "../../../../lib/telegram.js";
-import { parseStartPayload, parseStopPayload, testAlertText } from "../../../../lib/alerts.js";
-import { boardFacts, factLine } from "../../../../lib/alertsend.js";
+import { rest, restMutate } from "../../../lib/supabase.js";
+import { sendMessage, answerCallbackQuery } from "../../../lib/telegram.js";
+import { parseStartPayload, parseStopPayload, testAlertText } from "../../../lib/alerts.js";
+import { boardFacts, factLine } from "../../../lib/alertsend.js";
 
 export const dynamic = "force-dynamic";
 
