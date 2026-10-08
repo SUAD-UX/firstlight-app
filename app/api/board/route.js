@@ -37,7 +37,7 @@ export async function GET(request) {
     const msg = String(e?.message || e);
     const session = resolveSession(view); // pure ET math — works without env
     return NextResponse.json({
-      schema_version: "1.1.0",
+      schema_version: "1.4.0",
       mode: "error",
       view,
       size_usd: size,

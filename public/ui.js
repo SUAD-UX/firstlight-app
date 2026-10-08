@@ -81,6 +81,141 @@ function coverLine(cov) {
     ' snapshots per market' + (cov.ok ? "" : " — under the pre-registered minimum") +
     (cov.waived ? " (rule waived in demo mode — labelled)" : "") + '</div>';
 }
+function fmtN(x) {
+  return (x == null || isNaN(x)) ? "—" : Number(x).toLocaleString("en-US");
+}
+function bp1(x) {
+  return x == null ? "no data" : Number(x).toFixed(1) + " bp";
+}
+/* plain-words mapping of the engine's machine reason codes (audit trail:
+   the codes themselves are always shown too, in mono) */
+function reasonPhrase(code) {
+  const c = String(code || "");
+  let m;
+  if (c === "spot_freshness_unverified")
+    return "the spot tape had no prints, so spot freshness could not be verified";
+  if (c === "perp_book_cannot_fill_size")
+    return "the perp book could not fill this size";
+  if (c === "spot_book_cannot_fill_size")
+    return "the spot book could not fill this size";
+  if (c === "no_book_within_120s_of_eval")
+    return "no book was recorded within ±120 s of the hour";
+  if (c === "live_read_unavailable")
+    return "the live recorder read was unavailable";
+  if ((m = c.match(/^perp_rt_([\d.]+)bp>(\d+)$/)))
+    return "the perp all-in cost " + m[1] + " bp exceeded its " + m[2] + " bp pre-registered limit";
+  if ((m = c.match(/^spot_rt_([\d.]+)bp>(\d+)$/)))
+    return "the spot all-in cost " + m[1] + " bp exceeded its " + m[2] + " bp pre-registered limit";
+  if ((m = c.match(/^perp_rt_([\d.]+)bp<=(\d+)$/)))
+    return "the perp all-in cost " + m[1] + " bp was within its " + m[2] + " bp limit";
+  if ((m = c.match(/^spot_rt_([\d.]+)bp<=(\d+)$/)))
+    return "the spot all-in cost " + m[1] + " bp was within its " + m[2] + " bp limit";
+  if ((m = c.match(/^perp_stale_(\d+)min>(\d+)$/)))
+    return "the perp tape was " + m[1] + " min old, past its " + m[2] + " min freshness limit";
+  if ((m = c.match(/^spot_stale_(\d+)min>(\d+)$/)))
+    return "the spot tape was " + m[1] + " min old, past its " + m[2] + " min freshness limit";
+  if ((m = c.match(/^spot_fresh_([\d.]+)min<=(\d+)$/)))
+    return "the spot tape was " + m[1] + " min old, within its freshness limit";
+  if ((m = c.match(/^coverage_(\d+)<(\d+)$/)))
+    return "coverage was " + m[1] + " snapshots per market, under the " + m[2] + " minimum";
+  return c.replace(/_/g, " ");
+}
+function plainReasons(reasons) {
+  return (reasons || []).map(reasonPhrase);
+}
+/* the venue whose execution quality the evidence supports this hour: perp
+   when its all-in RT is within the pre-registered limit; else spot only when
+   spot is within its limit AND its tape freshness is verified. Null when
+   neither qualifies — then no hand-off button is shown (never a guess). */
+function venuePick(cell, T) {
+  if (!cell || !T) return null;
+  const okLeg = (leg, lim) => !!leg && !!leg.observed && leg.complete !== false &&
+    leg.rt_bp != null && leg.rt_bp <= lim;
+  if (okLeg(cell.perp, T.perp_rt_max_bp)) return { venue: "perp", rt_bp: cell.perp.rt_bp };
+  if (okLeg(cell.spot, T.spot_rt_max_bp) && cell.freshness &&
+      cell.freshness.spot && cell.freshness.spot.observed)
+    return { venue: "spot", rt_bp: cell.spot.rt_bp };
+  return null;
+}
+/* verified live 2026-10-07 — both patterns resolve (HTTP 200):
+   spot  https://www.bitget.com/spot/RNVDAUSDT
+   perp  https://www.bitget.com/futures/usdt/NVDAUSDT */
+function bitgetUrl(venue, name) {
+  if (venue === "perp")
+    return "https://www.bitget.com/futures/usdt/" + encodeURIComponent(name) + "USDT";
+  if (venue === "spot")
+    return "https://www.bitget.com/spot/R" + encodeURIComponent(name) + "USDT";
+  return null;
+}
+/* gauge: perp all-in RT vs its pre-registered limit; the limit sits at 2/3
+   of the arc (scale 0 … 1.5 × limit) */
+function gaugeData(cell, T) {
+  const limit = T ? T.perp_rt_max_bp : 15;
+  if (!cell || !cell.perp || !cell.perp.observed || cell.perp.rt_bp == null)
+    return { observed: false, limit };
+  const v = cell.perp.rt_bp;
+  return { observed: true, value: v, limit, over: v > limit,
+           frac: Math.min(1, v / (limit * 1.5)) };
+}
+/* perp vs spot share of the combined all-in round-trip cost */
+function splitData(cell) {
+  const p = cell && cell.perp && cell.perp.observed ? cell.perp.rt_bp : null;
+  const s = cell && cell.spot && cell.spot.observed ? cell.spot.rt_bp : null;
+  if (p == null && s == null) return null;
+  const tot = ((p || 0) + (s || 0)) || 1;
+  return { perpBp: p, spotBp: s,
+           perpShare: p == null ? 0 : p / tot, spotShare: s == null ? 0 : s / tot };
+}
+/* all-in RT per block for one name across the night (null = not observed) */
+function costSeries(board, name) {
+  const perp = [], spot = [];
+  for (const b of (board && board.blocks) || []) {
+    const c = (b.cells || []).find((x) => x.name === name);
+    perp.push(c && c.perp && c.perp.observed && c.perp.rt_bp != null ? c.perp.rt_bp : null);
+    spot.push(c && c.spot && c.spot.observed && c.spot.rt_bp != null ? c.spot.rt_bp : null);
+  }
+  return { perp, spot };
+}
+/* fills recorded per block for one name (activity bars) + tape cap flag */
+function activitySeries(board, name) {
+  const hours = [];
+  for (const b of (board && board.blocks) || []) {
+    const f = b.fills && b.fills[name];
+    hours.push(f ? { spot: f.spot | 0, perp: f.perp | 0 } : { spot: 0, perp: 0 });
+  }
+  const cap = board && board.tape_capped && board.tape_capped[name];
+  return { hours, capped: !!(cap && (cap.perp || cap.spot)) };
+}
+/* ticker strip: one chip per name — latest COMPLETED block's state + perp
+   cost. No prices, no up/down arrows, ever. */
+function tickerChips(board) {
+  if (!board || board.mode !== "live" || !Array.isArray(board.blocks)) return null;
+  const chips = [];
+  for (const name of board.names || []) {
+    let pick = null, idx = -1;
+    board.blocks.forEach((b, i) => {
+      const c = (b.cells || []).find((x) => x.name === name);
+      if (c && b.complete) { pick = c; idx = i; }
+    });
+    if (pick) chips.push({ name, state: pick.state, k: stateKey(pick.state), col: idx,
+      cost: pick.perp && pick.perp.observed && pick.perp.rt_bp != null
+        ? pick.perp.rt_bp : null });
+  }
+  return chips.length ? { chips } : null;
+}
+/* SVG polyline points for a real close series inside a w×h box — pure,
+   no DOM. One close becomes a short flat segment; empty -> null. */
+function closesPath(closes, w, h) {
+  if (!Array.isArray(closes) || closes.length < 1) return null;
+  const vals = closes.length === 1 ? [closes[0], closes[0]] : closes;
+  const lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  const pad = 3;
+  const y = (v) => (hi === lo) ? h / 2 : pad + (1 - (v - lo) / (hi - lo)) * (h - 2 * pad);
+  const x = (i) => (closes.length === 1)
+    ? (i === 0 ? w * .35 : w * .65)
+    : 1 + i * (w - 2) / (vals.length - 1);
+  return vals.map((v, i) => x(i).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
+}
 /* @pure-end */
 
 /* ─────────── ET session labels — fallbacks when the server line is ────────
@@ -165,101 +300,6 @@ const VIEWS = {
   }
 };
 
-/* ══════════ THE CHESSBOARD — crisp perspective plane behind the page ══════════
-   Dark #0E0A07 / light #4A3A26 squares, gold grid lines at 25%, gold trim
-   edge. NO blur filter ever touches the board; only the far horizon fades. */
-const NS = "http://www.w3.org/2000/svg";
-const boardsvg = document.getElementById("boardsvg");
-function buildBoardPlane() {
-  const W = innerWidth, H = innerHeight;
-  boardsvg.setAttribute("viewBox", "0 0 " + W + " " + H);
-  boardsvg.setAttribute("width", W);
-  boardsvg.setAttribute("height", H);
-  boardsvg.innerHTML = "";
-  const el = (t, a) => { const e = document.createElementNS(NS, t);
-    for (const k in a) e.setAttribute(k, a[k]); boardsvg.appendChild(e); return e; };
-
-  const files = 8, ranks = 12, growth = 1.24;   /* perspective growth per rank */
-  const hy = Math.round(H * .32);               /* the horizon                 */
-  const by = Math.round(H * 1.04);              /* board bottom, just past the fold */
-  const span = by - hy, cx = W / 2;
-  const wTop = W * .24, wBot = W * 2.5;         /* top / bottom edge widths */
-
-  const w = []; let wsum = 0;
-  for (let i = 0; i < ranks; i++) { w.push(Math.pow(growth, i)); wsum += w[i]; }
-  const ys = [hy]; let acc = hy;
-  for (let i = 0; i < ranks; i++) { acc += span * w[i] / wsum; ys.push(acc); }
-  const fr = ys.map(y => (y - hy) / span);
-  const Ls = fr.map(f => cx - (wTop + (wBot - wTop) * f) / 2);
-  const Rs = fr.map(f => cx + (wTop + (wBot - wTop) * f) / 2);
-
-  for (let i = 0; i < ranks; i++) {
-    for (let j = 0; j < files; j++) {
-      const x1 = Ls[i]   + (Rs[i]   - Ls[i])   * j       / files;
-      const x2 = Ls[i]   + (Rs[i]   - Ls[i])   * (j + 1) / files;
-      const X1 = Ls[i+1] + (Rs[i+1] - Ls[i+1]) * j       / files;
-      const X2 = Ls[i+1] + (Rs[i+1] - Ls[i+1]) * (j + 1) / files;
-      el("polygon", { points:
-        x1.toFixed(1) + "," + ys[i].toFixed(1) + " " + x2.toFixed(1) + "," + ys[i].toFixed(1) + " " +
-        X2.toFixed(1) + "," + ys[i+1].toFixed(1) + " " + X1.toFixed(1) + "," + ys[i+1].toFixed(1),
-        fill: ((i + j) % 2) ? "#4A3A26" : "#0E0A07" });
-    }
-  }
-  const grid = { fill: "none", stroke: "#D4B07A", "stroke-opacity": ".25",
-    "stroke-width": "1", "vector-effect": "non-scaling-stroke" };
-  for (let j = 0; j <= files; j++) {
-    el("polyline", Object.assign({ points: ys.map((y, i) =>
-      (Ls[i] + (Rs[i] - Ls[i]) * j / files).toFixed(1) + "," + y.toFixed(1)).join(" ") }, grid));
-  }
-  for (let i = 0; i <= ranks; i++) {
-    el("line", Object.assign({ x1: Ls[i].toFixed(1), y1: ys[i].toFixed(1),
-      x2: Rs[i].toFixed(1), y2: ys[i].toFixed(1) }, grid));
-  }
-  const rim = (in0, inB, dy0, dyB) =>
-    (Ls[0] + in0).toFixed(1) + "," + (ys[0] + dy0).toFixed(1) + " " +
-    (Rs[0] - in0).toFixed(1) + "," + (ys[0] + dy0).toFixed(1) + " " +
-    (Rs[ranks] - inB).toFixed(1) + "," + (ys[ranks] - dyB).toFixed(1) + " " +
-    (Ls[ranks] + inB).toFixed(1) + "," + (ys[ranks] - dyB).toFixed(1);
-  el("polygon", { points: rim(0, 0, 0, 0), fill: "none", stroke: "#D4B07A",
-    "stroke-opacity": ".6", "stroke-width": "2.5", "vector-effect": "non-scaling-stroke" });
-  el("polygon", { points: rim(10, 26, 6, 14), fill: "none", stroke: "#D4B07A",
-    "stroke-opacity": ".3", "stroke-width": "1", "vector-effect": "non-scaling-stroke" });
-
-  const defs = document.createElementNS(NS, "defs");
-  defs.innerHTML =
-    '<linearGradient id="bpFade" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#0F0D0D"/>' +
-      '<stop offset=".55" stop-color="#0F0D0D" stop-opacity=".85"/>' +
-      '<stop offset="1" stop-color="#0F0D0D" stop-opacity="0"/>' +
-    '</linearGradient>' +
-    '<linearGradient id="bpHalo" x1="0" y1="0" x2="0" y2="1">' +
-      '<stop offset="0" stop-color="#D4B07A" stop-opacity=".12"/>' +
-      '<stop offset="1" stop-color="#D4B07A" stop-opacity="0"/>' +
-    '</linearGradient>' +
-    '<linearGradient id="bpSheen" x1="0" y1="0" x2="1" y2="0">' +
-      '<stop offset="0" stop-color="#F2EFE8" stop-opacity="0"/>' +
-      '<stop offset=".5" stop-color="#F2EFE8" stop-opacity=".05"/>' +
-      '<stop offset="1" stop-color="#F2EFE8" stop-opacity="0"/>' +
-    '</linearGradient>';
-  boardsvg.appendChild(defs);
-  el("rect", { x: 0, y: hy, width: W, height: Math.round(H * .06), fill: "url(#bpHalo)" });
-  el("rect", { x: -Math.round(W * .1), y: Math.round(H * .55), width: Math.round(W * 1.2),
-    height: Math.round(H * .14), fill: "url(#bpSheen)",
-    transform: "rotate(-8 " + (W / 2) + " " + Math.round(H * .62) + ")" });
-  el("rect", { x: -Math.round(W * .1), y: Math.round(H * .78), width: Math.round(W * 1.2),
-    height: Math.round(H * .07), fill: "url(#bpSheen)",
-    transform: "rotate(-8 " + (W / 2) + " " + Math.round(H * .82) + ")" });
-
-  let k = 0; while (k < ranks && (ys[k + 1] - hy) / span < .22) k++;
-  el("polygon", { points:
-    Ls[0].toFixed(1) + "," + ys[0].toFixed(1) + " " + Rs[0].toFixed(1) + "," + ys[0].toFixed(1) + " " +
-    Rs[k].toFixed(1) + "," + ys[k].toFixed(1) + " " + Ls[k].toFixed(1) + "," + ys[k].toFixed(1),
-    fill: "url(#bpFade)" });
-}
-buildBoardPlane();
-let bpT = 0;
-addEventListener("resize", () => { clearTimeout(bpT); bpT = setTimeout(buildBoardPlane, 150); });
-
 /* ══════════════════════ the real-data board (no demo data) ══════════════════════ */
 const grid = document.getElementById("grid");
 const ev = document.getElementById("evidence");
@@ -273,6 +313,9 @@ const tapeValue = document.getElementById("tapeValue");
 const tapeSub = document.getElementById("tapeSub");
 const verdictValue = document.getElementById("verdictValue");
 const verdictSub = document.getElementById("verdictSub");
+const statePill = document.getElementById("statePill");
+const tickerbar = document.getElementById("tickerbar");
+const tickerIn = document.getElementById("tickerIn");
 
 let size = 1000, view = "last_night", current = null, boardSeen = false;
 let namesOrder = ["NVDA", "TSLA", "AAPL", "MSFT", "SPY"];
@@ -307,17 +350,35 @@ function buildGrid(names, blocks) {
       b.type = "button";
       b.className = "sq" + (((r + c) % 2) ? " alt" : "");
       b.dataset.state = k; b.dataset.name = name; b.dataset.col = c;
-      b.setAttribute("aria-label", name + ", " +
-        (blocks && blocks[c] && blocks[c].block_label ? blocks[c].block_label : V.blocks[c]) +
-        " ET, " + state + (k === "n" ? " — tap for why" : " — tap for evidence"));
-      b.innerHTML = '<span class="tm" aria-hidden="true">' + V.times[c] + '</span>' +
-        '<span class="g" aria-hidden="true">' + ICONS[k] + '</span>' +
-        '<span class="lb" aria-hidden="true">' + LABELS[k] + '</span>';
+      const blab = blocks && blocks[c] && blocks[c].block_label
+        ? blocks[c].block_label                    /* server label ends with " ET" */
+        : V.blocks[c] + " ET";                     /* static fallback needs it */
+      b.setAttribute("aria-label", name + ", " + blab +
+        ", " + state + (k === "n" ? " — tap for why" : " — tap for evidence"));
+      const px = cell && cell.px != null ? cell.px : null;
+      const bp = cell && cell.perp && cell.perp.rt_bp != null ? cell.perp.rt_bp : null;
+      const cs = cell && Array.isArray(cell.closes) ? cell.closes : null;
+      const up = cs && cs.length > 1 && cs[cs.length - 1] >= cs[0];
+      const pts = cs && cs.length ? closesPath(cs, 100, 26) : null;
+      b.innerHTML =
+        '<span class="sq__top"><b class="sq__nm">' + name + '</b>' +
+          '<span class="sq__px">' + (px != null ? px.toFixed(2) : 'no data') + '</span></span>' +
+        (pts
+          ? '<svg class="sq__chart" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true">' +
+            '<polyline fill="none" stroke="' + (up ? '#D4B07A' : '#EFE9DC') +
+            '" stroke-width="1.6" stroke-linejoin="round" points="' + pts + '"/></svg>'
+          : '<span class="sq__chart sq__chart--none" aria-hidden="true"></span>') +
+        '<span class="sq__bot"><span class="sq__bp">' +
+          (bp != null ? bp.toFixed(1) + ' bp' : 'no data') + '</span>' +
+          '<span class="sq__vd"><i class="g" aria-hidden="true">' + ICONS[k] + '</i>' +
+            LABELS[k] + '</span></span>' +
+        '<span class="tm" aria-hidden="true">' + V.times[c] + '</span>';
       row.appendChild(b);
       cells[name + ":" + c] = { btn: b, cell, block: blocks ? blocks[c] : null };
     }
     grid.appendChild(row);
   });
+
   if (boardSeen) lightSquares();
 }
 
@@ -336,39 +397,272 @@ function lightSquares() {
   });
 }
 
-/* evidence — opens on tap, every number observed/estimated with its n */
+/* ── evidence panel components — hand-drawn SVG, no chart library ── */
+function gaugeSvg(g, name) {
+  const cx = 75, cy = 78, r = 58;
+  const pt = (frac, rad) => {
+    const a = Math.PI * (1 - frac);              // left end -> right end
+    return [cx + rad * Math.cos(a), cy - rad * Math.sin(a)];
+  };
+  const arc = (f0, f1, rad) => {
+    const s = pt(f0, rad), e = pt(f1, rad);
+    return "M " + s[0].toFixed(2) + " " + s[1].toFixed(2) +
+      " A " + rad + " " + rad + " 0 0 1 " + e[0].toFixed(2) + " " + e[1].toFixed(2);
+  };
+  const limFrac = 1 / 1.5;                       // limit at 2/3 of the arc
+  const lt0 = pt(limFrac, r - 11), lt1 = pt(limFrac, r + 11);
+  const aria = g.observed
+    ? name + " perp all-in round-trip cost " + g.value.toFixed(1) +
+      " bp against the " + g.limit + " bp pre-registered limit"
+    : name + " perp all-in round-trip cost: no data";
+  let s = '<svg class="gauge" viewBox="0 0 150 100" role="img" aria-label="' + esc(aria) + '">';
+  s += '<path d="' + arc(0, 1, r) + '" fill="none" stroke="rgba(155,134,120,.34)" stroke-width="7" stroke-linecap="round"' +
+    (g.observed ? "" : ' stroke-dasharray="4 6"') + '/>';
+  if (g.observed) {
+    s += '<path d="' + arc(0, Math.max(0.0015, g.frac), r) + '" fill="none" stroke="' +
+      (g.over ? "#E8CBA0" : "var(--gold)") + '" stroke-width="7" stroke-linecap="round"' +
+      (g.over ? ' stroke-dasharray="9 5"' : "") + '"/>';
+  }
+  s += '<line x1="' + lt0[0].toFixed(1) + '" y1="' + lt0[1].toFixed(1) + '" x2="' + lt1[0].toFixed(1) +
+    '" y2="' + lt1[1].toFixed(1) + '" stroke="var(--gold)" stroke-width="2"/>';
+  const lab = pt(limFrac, r + 20);
+  s += '<text x="' + lab[0].toFixed(1) + '" y="' + lab[1].toFixed(1) +
+    '" class="gauge__lim" text-anchor="middle">limit ' + g.limit + '</text>';
+  if (g.observed) {
+    s += '<text x="75" y="68" class="gauge__v" text-anchor="middle">' + g.value.toFixed(1) + '</text>' +
+      '<text x="75" y="84" class="gauge__u" text-anchor="middle">bp all-in RT · perp</text>' +
+      (g.over ? '<text x="75" y="96" class="gauge__over" text-anchor="middle">over the limit</text>' : "");
+  } else {
+    s += '<text x="75" y="68" class="gauge__v" text-anchor="middle">—</text>' +
+      '<text x="75" y="84" class="gauge__u" text-anchor="middle">no data · perp leg</text>';
+  }
+  return s + '</svg>';
+}
+function tileHtml(label, value, sub, ok) {
+  return '<div class="evt' + (ok ? "" : " evt--nd") + '"><span class="evt__l">' + label +
+    '</span><span class="evt__v">' + value + '</span><span class="evt__s">' + sub + '</span></div>';
+}
+function tilesHtml(c, fees) {
+  const p = c && c.perp, s = c && c.spot, f = c && c.freshness;
+  const perpOk = !!(p && p.observed && p.rt_bp != null);
+  const spotOk = !!(s && s.observed && s.rt_bp != null);
+  const tapeOk = !!(f && f.perp && f.perp.observed);
+  const cov = c && c.coverage;
+  return tileHtml("perp cost", perpOk ? p.rt_bp.toFixed(1) + ' <i>bp</i>' : "—",
+      perpOk ? "n=" + p.n_books + " book · incl. " + (fees ? fees.perp : 12) + " bp fees" : "no book within ±120 s",
+      perpOk) +
+    tileHtml("spot cost", spotOk ? s.rt_bp.toFixed(1) + ' <i>bp</i>' : "—",
+      spotOk ? "n=" + s.n_books + " book · incl. " + (fees ? fees.spot : 20) + " bp fees" : "no book within ±120 s",
+      spotOk) +
+    tileHtml("tape age", tapeOk ? f.perp.age_min.toFixed(1) + ' <i>min</i>' : "—",
+      tapeOk ? "perp tape · n=" + fmtN(f.perp.n_fills) + " fills" : "no fills on the recorded tape",
+      tapeOk) +
+    tileHtml("coverage", cov ? cov.n + "/" + cov.required : "—",
+      cov ? (cov.ok ? "snapshots per market · ok" : "under the pre-registered minimum") : "no data",
+      !!(cov && cov.ok));
+}
+function splitHtml(sd, sizeLabel) {
+  if (!sd) return '<div class="evsplit evsplit--nd">venue split — no data (neither book was observed within ±120 s)</div>';
+  const seg = (cls, share, lab) =>
+    '<div class="evsplit__seg evsplit__seg--' + cls + '" style="width:' +
+    (share * 100).toFixed(1) + '%">' + (share >= 0.16 ? lab : "") + '</div>';
+  return '<div class="evsplit"><div class="evsplit__bar">' +
+    (sd.perpBp != null ? seg("perp", sd.perpShare, "perp " + sd.perpBp.toFixed(1) + " bp") : "") +
+    (sd.spotBp != null ? seg("spot", sd.spotShare, "spot " + sd.spotBp.toFixed(1) + " bp") : "") +
+    '</div><span class="evsplit__cap">share of combined all-in round-trip cost at ' +
+    esc(sizeLabel || "") + ' — perp gold · spot cream' +
+    (sd.perpBp != null && sd.spotBp != null
+      ? (sd.perpBp <= sd.spotBp ? " · perp is the cheaper leg this hour" : " · spot is the cheaper leg this hour")
+      : "") + '</span></div>';
+}
+function kvHtml(c, hourFills, fees) {
+  const p = c && c.perp, s = c && c.spot;
+  const one = (leg) => leg && leg.observed
+    ? leg.book_age_s.toFixed(1) + " s" : "no data";
+  const lv = (leg) => leg && leg.observed
+    ? leg.levels_buy + "×" + leg.levels_sell : "no data";
+  const row = (k, v) => '<div class="kv"><span class="kv__k">' + k + '</span><span class="kv__v">' + v + '</span></div>';
+  return '<div class="evkv">' +
+    row("book age", "perp " + one(p) + " · spot " + one(s)) +
+    row("depth levels", "perp " + lv(p) + " · spot " + lv(s)) +
+    row("fills in this hour", hourFills
+      ? "perp " + fmtN(hourFills.perp) + " · spot " + fmtN(hourFills.spot) : "no data") +
+    row("fees (round trip)", fees
+      ? "perp " + fees.perp + " bp · spot " + fees.spot + " bp" : "no data") +
+    '</div>';
+}
+/* line chart: all-in RT across the night; gaps where a leg was not observed */
+function costLineSvg(cs, T, sel, headers) {
+  const W = 320, H = 136, L = 34, R = 30, T0 = 12, B = 18;
+  const xs = (i) => L + i * (W - L - R) / 7;
+  const vals = [];
+  cs.perp.forEach((v) => v != null && vals.push(v));
+  cs.spot.forEach((v) => v != null && vals.push(v));
+  if (T) vals.push(T.perp_rt_max_bp, T.spot_rt_max_bp);
+  if (!vals.length) return '<div class="evchart__nd">no observed costs this night — nothing is drawn</div>';
+  const ymax = Math.max.apply(null, vals) * 1.12;
+  const ys = (v) => T0 + (1 - v / ymax) * (H - T0 - B);
+  const runs = (arr) => {
+    const out = []; let cur = null;
+    arr.forEach((v, i) => {
+      if (v == null) { cur = null; return; }
+      const p = xs(i).toFixed(1) + " " + ys(v).toFixed(1);
+      if (!cur) { cur = ["M " + p]; out.push(cur); } else cur.push("L " + p);
+    });
+    return out.map((r) => r.join(" "));
+  };
+  const dots = (arr, cls) => arr.map((v, i) => v == null ? "" :
+    '<circle cx="' + xs(i).toFixed(1) + '" cy="' + ys(v).toFixed(1) +
+    '" r="' + (i === sel ? 3.4 : 2.3) + '" class="' + cls + (i === sel ? " evchart__dot--sel" : "") + '"/>').join("");
+  let s = '<svg class="evchart__svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' +
+    'all-in round-trip cost by hour: gold perp, cream spot; dashed lines are the pre-registered limits">' +
+    '<line x1="' + L + '" y1="' + ys(0).toFixed(1) + '" x2="' + (W - R) + '" y2="' + ys(0).toFixed(1) +
+    '" class="evchart__axis"/>';
+  if (T) {
+    s += '<line x1="' + L + '" y1="' + ys(T.perp_rt_max_bp).toFixed(1) + '" x2="' + (W - R) +
+      '" y2="' + ys(T.perp_rt_max_bp).toFixed(1) + '" class="evchart__lim evchart__lim--perp"/>' +
+      '<text x="' + (W - R + 3) + '" y="' + (ys(T.perp_rt_max_bp) + 3).toFixed(1) + '" class="evchart__limt">' + T.perp_rt_max_bp + '</text>' +
+      '<line x1="' + L + '" y1="' + ys(T.spot_rt_max_bp).toFixed(1) + '" x2="' + (W - R) +
+      '" y2="' + ys(T.spot_rt_max_bp).toFixed(1) + '" class="evchart__lim evchart__lim--spot"/>' +
+      '<text x="' + (W - R + 3) + '" y="' + (ys(T.spot_rt_max_bp) + 3).toFixed(1) + '" class="evchart__limt">' + T.spot_rt_max_bp + '</text>';
+  }
+  s += runs(cs.spot).map((d) => '<path d="' + d + '" class="evchart__line evchart__line--spot"/>').join("");
+  s += runs(cs.perp).map((d) => '<path d="' + d + '" class="evchart__line evchart__line--perp"/>').join("");
+  s += dots(cs.spot, "evchart__dot evchart__dot--spot") + dots(cs.perp, "evchart__dot evchart__dot--perp");
+  if (sel >= 0) s += '<line x1="' + xs(sel).toFixed(1) + '" y1="' + T0 + '" x2="' + xs(sel).toFixed(1) +
+    '" y2="' + ys(0).toFixed(1) + '" class="evchart__sel"/>';
+  headers.forEach((h, i) => {
+    s += '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 5) + '" class="evchart__xl" text-anchor="middle">' + esc(h) + '</text>';
+  });
+  return s + '</svg>';
+}
+/* activity bars: fills recorded per hour, perp vs spot — a silent spot tape
+   is visible at a glance */
+function activitySvg(act, sel, headers) {
+  const W = 320, H = 96, L = 34, R = 10, T0 = 16, B = 18;
+  const xs = (i) => L + i * (W - L - R) / 7;
+  let max = 0;
+  act.hours.forEach((h) => { max = Math.max(max, h.spot, h.perp); });
+  if (!max) return '<div class="evact__nd">no fills recorded this night — the panel stays empty rather than inventing activity</div>';
+  const base = H - B;
+  const bar = (i, v, cls, off) => {
+    const hgt = Math.max(v ? 2 : 0, (v / max) * (base - T0));
+    const x = xs(i) + off;
+    return '<rect x="' + x.toFixed(1) + '" y="' + (base - hgt).toFixed(1) +
+      '" width="9" height="' + hgt.toFixed(1) + '" class="' + cls + '">' +
+      (v ? "<title>" + v + " fills</title>" : "") + "</rect>";
+  };
+  let s = '<svg class="evact__svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' +
+    'fills recorded per hour: gold perp, cream spot' + (act.capped ? "; busy tapes are page-capped so hours can under-count" : "") + '">' +
+    '<line x1="' + L + '" y1="' + base + '" x2="' + (W - R) + '" y2="' + base + '" class="evchart__axis"/>';
+  act.hours.forEach((h, i) => {
+    s += bar(i, h.perp, "evact__b evact__b--perp" + (act.capped ? " evact__b--cap" : ""), -10);
+    s += bar(i, h.spot, "evact__b evact__b--spot" + (act.capped ? " evact__b--cap" : ""), 1);
+    if (h.perp) s += '<text x="' + (xs(i) - 5.5).toFixed(1) + '" y="' + (base - (h.perp / max) * (base - T0) - 3).toFixed(1) +
+      '" class="evact__n">' + (h.perp >= 1000 ? "999+" : h.perp) + '</text>';
+  });
+  if (sel >= 0) s += '<line x1="' + xs(sel).toFixed(1) + '" y1="' + T0 + '" x2="' + xs(sel).toFixed(1) +
+    '" y2="' + base + '" class="evchart__sel"/>';
+  headers.forEach((h, i) => {
+    s += '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 5) + '" class="evchart__xl" text-anchor="middle">' + esc(h) + '</text>';
+  });
+  return s + '</svg>';
+}
+
+/* evidence — opens on tap: the mini trading panel, every number observed
+   with its n, gaps shown as no data */
 function showEvidence(name, col) {
   const rec = cells[name + ":" + col];
   if (!rec) return;
   Object.values(cells).forEach((r) => r.btn.classList.remove("sel"));
   rec.btn.classList.add("sel");
   const c = rec.cell, blk = rec.block;
-  const bl = blk && blk.block_label ? blk.block_label : VIEWS[view].blocks[col];
+  const bl = blk && blk.block_label ? blk.block_label : VIEWS[view].blocks[col] + " ET";
   const k = c ? stateKey(c.state) : "n";
+  const T = current && current.thresholds ? current.thresholds : null;
+  const fees = current && current.fees_rt_bp ? current.fees_rt_bp : null;
+  const sizeLabel = current && current.size_label ? current.size_label : ("$" + size.toLocaleString("en-US"));
+  const hourFills = blk && blk.fills ? (blk.fills[name] || null) : null;
+  const headers = VIEWS[view].headers;
+
   let h = '<div class="evidence__head">' +
     '<span class="evidence__name">' + esc(name) + '</span>' +
-    '<span class="evidence__block">' + esc(bl) + ' ET</span>' +
-    '<span class="state state--' + k + '">' + (c ? esc(c.state) : "NO DATA") + '</span></div>';
-  if (c) {
-    h += legLine("perp", c.perp) + legLine("spot", c.spot);
-    h += tapeLine(c.freshness);
-    h += coverLine(c.coverage);
-    if (c.reasons && c.reasons.length)
-      h += '<div class="ev" style="font-family:var(--sans);color:rgba(242,239,232,.68)">why: <span class="mono">' +
-        c.reasons.map(esc).join(" · ") + '</span>' +
-        (c.labels ? '<br>' + esc(c.labels) : '') + '</div>';
-    if (current && current.fees_rt_bp)
-      h += '<div class="evidence__rule">all-in = book walk + fees (perp ' +
-        current.fees_rt_bp.perp + ' bp · spot ' + current.fees_rt_bp.spot +
-        ' bp round trip) · thresholds pre-registered · execution quality, never direction</div>';
+    '<span class="evidence__block">' + esc(bl) + '</span>' +
+    '<span class="state state--' + k + '"><span class="state__g" aria-hidden="true">' +
+    ICONS[k] + '</span>' + (c ? esc(c.state) : "NO DATA") + '</span></div>';
+
+  /* gauge + 2×2 tiles */
+  h += '<div class="evgrid">' +
+    '<div class="evgauge">' + gaugeSvg(gaugeData(c, T), name) + '</div>' +
+    '<div class="evtiles">' + tilesHtml(c, fees) + '</div></div>';
+
+  /* perp vs spot split bar */
+  h += splitHtml(c ? splitData(c) : null, sizeLabel);
+
+  /* key/value rows with hairlines */
+  h += kvHtml(c, hourFills, fees);
+
+  /* the reason in plain words (machine codes always shown too) */
+  const phrases = c && c.reasons ? plainReasons(c.reasons) : [];
+  h += '<p class="evwhy"><b>' + (c ? esc(c.state) : "NO DATA") + '</b>' +
+    (phrases.length ? " — " + phrases.map(esc).join("; ") : " — no data for this hour; nothing is estimated from thin coverage.") +
+    '</p>';
+  if (c && c.reasons && c.reasons.length)
+    h += '<p class="evwhy__codes">' + c.reasons.map(esc).join(" · ") + '</p>';
+
+  /* charts across the night */
+  h += '<div class="evchart">' + costLineSvg(costSeries(current, name), T, col, headers) +
+    '<span class="evchart__cap">all-in round-trip cost by hour · gold perp (limit ' +
+    (T ? T.perp_rt_max_bp : 15) + ' bp) · cream spot (limit ' + (T ? T.spot_rt_max_bp : 35) +
+    ' bp) · gaps = not observed</span></div>';
+  h += '<div class="evact">' + activitySvg(activitySeries(current, name), col, headers) +
+    '<span class="evact__cap">fills recorded per hour · gold perp · cream spot — a silent spot tape is itself evidence' +
+    (activitySeries(current, name).capped
+      ? " · hatched = tape page-capped (newest 1,000 prints), hours can under-count" : "") +
+    '</span></div>';
+
+  /* trade hand-off (Part C) — only when the evidence supports a venue */
+  const vp = c ? venuePick(c, T) : null;
+  if (vp) {
+    const url = bitgetUrl(vp.venue, name);
+    h += '<div class="evhandoff"><a class="bitgetbtn" href="' + url +
+      '" target="_blank" rel="noopener noreferrer">Open ' + esc(name) + " " +
+      (vp.venue === "perp" ? "perp" : "rToken spot") + ' on Bitget ↗</a>' +
+      '<p class="evhandoff__x">You confirm and trade on Bitget. Firstlight shows execution quality, never direction.</p></div>';
   } else {
-    h += '<div class="ev" style="font-family:var(--sans);color:rgba(242,239,232,.68)">' +
-      'No data for this block yet — nothing is shown and nothing is invented. ' +
-      'The square fills only when the recorder captured it (>=30 snapshots per ' +
-      'market and a book within ±120 s).</div>';
+    h += '<div class="evhandoff evhandoff--nd">no venue within its pre-registered limits this hour — no hand-off offered</div>';
   }
+
+  /* Why (Part D) — explained only from this square's evidence object */
+  h += '<div class="whysec"><button type="button" class="whybtn" id="whyBtn">' +
+    'Why this square?</button><div class="whyout" id="whyOut" hidden></div></div>';
+
+  if (c && current && current.fees_rt_bp)
+    h += '<div class="evidence__rule">all-in = book walk + fees (perp ' +
+      current.fees_rt_bp.perp + ' bp · spot ' + current.fees_rt_bp.spot +
+      ' bp round trip) · thresholds pre-registered · execution quality, never direction</div>';
+
   ev.classList.add("open");
   ev.innerHTML = h;
+
+  const whyBtn = ev.querySelector("#whyBtn");
+  const whyOut = ev.querySelector("#whyOut");
+  if (whyBtn) whyBtn.addEventListener("click", async () => {
+    whyOut.hidden = false;
+    whyOut.innerHTML = '<p class="whyout__load">explaining from the evidence…</p>';
+    try {
+      const r = await fetch("/api/why?name=" + encodeURIComponent(name) +
+        "&block=" + col + "&size=" + size + "&view=" + view);
+      const j = await r.json();
+      whyOut.innerHTML =
+        '<p class="whyout__t">' + esc(j && j.text ? j.text : "no data") + '</p>' +
+        '<p class="whyout__src">source: ' + (j && j.source === "model"
+          ? "LLM · evidence-locked" : "built-in narrator · deterministic") + '</p>' +
+        (j && j.footer ? '<p class="whyout__f">' + esc(j.footer) + '</p>' : "");
+    } catch (e) {
+      whyOut.innerHTML = '<p class="whyout__t">no data — the explanation service is unreachable right now.</p>';
+    }
+  });
 }
 grid.addEventListener("click", (e) => {
   const b = e.target.closest(".sq");
@@ -404,6 +698,22 @@ function applyBoard(board) {
     badge.title = (board && board.note) || "the live read failed; nothing is invented";
   }
 
+  /* the hero state light — switches to the real state when the board lands */
+  if (statePill) {
+    if (live) {
+      statePill.textContent = "LIVE – RECORDED";
+      statePill.className = "scene__chip scene__chip--live";
+      statePill.title = "numbers come from the Supabase recorder";
+    } else {
+      statePill.textContent = "NO DATA · LIVE READ UNAVAILABLE";
+      statePill.className = "scene__chip";
+      statePill.title = (board && board.note) || "the live read failed; nothing is invented";
+    }
+  }
+
+  /* ticker strip + the gold line on the board floor */
+  renderTickers(board);
+
   note.innerHTML = VIEWS[view].note + (live ? "" :
     " <b>Live read unavailable:</b> " +
     esc((board && board.note) || "unknown reason") +
@@ -433,13 +743,70 @@ function applyBoard(board) {
     tapeSub.textContent = "no recorder heartbeat received yet";
   }
   if (s) {
-    verdictValue.textContent = String(s.a);
+    verdictValue.textContent = String(s.a) + " actionable";
     verdictSub.textContent = "ACTIONABLE hours · " + s.t + " THIN · " + s.d +
       " DARK · " + s.n + " NO DATA — execution quality only, never direction";
   } else {
     verdictValue.textContent = "—";
     verdictSub.textContent = "verdicts appear only from recorded data";
   }
+}
+
+/* ─── ticker strip: one chip per name — verdict + perp cost, no prices ─── */
+function renderTickers(board) {
+  if (!tickerbar || !tickerIn) return;
+  const t = tickerChips(board);
+  if (!t) {
+    tickerIn.innerHTML = '<span class="tk tk--wait">' +
+      (board && board.mode === "error"
+        ? "no data · live read unavailable" : "reading the recorder…") + '</span>';
+    return;
+  }
+  tickerIn.innerHTML = "";
+  for (const c of t.chips) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tk tk--" + c.k;
+    b.dataset.name = c.name;
+    b.dataset.col = c.col;
+    b.setAttribute("aria-label", c.name + ", latest completed hour, " + c.state +
+      (c.cost != null ? ", perp all-in round trip " + c.cost.toFixed(1) + " bp"
+        : ", perp cost no data") + " — open its evidence");
+    b.innerHTML = '<b>' + esc(c.name) + '</b>' +
+      '<span class="tk__g" aria-hidden="true">' + ICONS[c.k] + '</span>' +
+      '<span class="tk__s">' + LABELS[c.k] + '</span>' +
+      '<span class="tk__c">' + (c.cost != null ? c.cost.toFixed(1) + " bp" : "—") + '</span>';
+    tickerIn.appendChild(b);
+  }
+  tickerbar.hidden = false;
+}
+tickerIn && tickerIn.addEventListener("click", (e) => {
+  const b = e.target.closest(".tk");
+  if (!b) return;
+  showEvidence(b.dataset.name, +b.dataset.col);
+  const board = document.getElementById("board");
+  if (board) board.scrollIntoView({ behavior: rm ? "auto" : "smooth" });
+});
+
+/* ─── alerts bell — scoped feature, honestly labelled, not live yet ─── */
+const bellBtn = document.getElementById("bellBtn");
+const bellPop = document.getElementById("bellPop");
+if (bellBtn && bellPop) {
+  const setPop = (open) => {
+    bellPop.hidden = !open;
+    bellBtn.setAttribute("aria-expanded", String(open));
+  };
+  bellBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setPop(bellPop.hidden);
+  });
+  document.addEventListener("click", (e) => {
+    if (!bellPop.hidden && !bellPop.contains(e.target) && !bellBtn.contains(e.target))
+      setPop(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setPop(false);
+  });
 }
 
 /* ─── fetch (real product: no demo fallback, ever) ─── */
@@ -500,73 +867,4 @@ if (rm || !("IntersectionObserver" in window)) {
   revs.forEach((el) => io.observe(el));
 }
 
-/* ══════════ B · SCROLL = A GAME — transform/opacity ONLY ══════════
-   hero->board: the NEAR knight hops an L.  board->how: the MID bishop slides
-   a diagonal.  how->honesty: the NEAR rook slides straight and captures the
-   MID pawn — it fades, dims and falls. */
-const stage     = document.getElementById("stage");
-const layerFar  = document.getElementById("layerFar");
-const layerMid  = document.getElementById("layerMid");
-const layerNear = document.getElementById("layerNear");
-const mvKnight  = document.getElementById("mv-knight");
-const mvBishop  = document.getElementById("mv-bishop");
-const mvRook    = document.getElementById("mv-rook");
-const mvPawn    = document.getElementById("mv-pawn");
-const sections = ["hero", "board", "how", "honesty"].map((id) => document.getElementById(id));
-let tops = [];
-const measure = () => { tops = sections.map((s) => s.offsetTop); };
-measure(); addEventListener("resize", measure);
-
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
-const ease = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-const prog = (sy, top, vh) => clamp01((sy + vh - top) / (vh * 0.95));
-
-/* desktop-only mouse parallax (translate only) */
-const finePointer = matchMedia("(pointer: fine)").matches;
-let mxT = 0, myT = 0, mx = 0, my = 0;
-if (finePointer && !rm) {
-  addEventListener("pointermove", (e) => {
-    mxT = e.clientX / innerWidth - .5;
-    myT = e.clientY / innerHeight - .5;
-    requestApply();
-  }, { passive: true });
-}
-
-let ticking = false;
-function requestApply() {
-  if (!ticking) { ticking = true; requestAnimationFrame(apply); }
-}
-function apply() {
-  ticking = false;
-  const sy = scrollY, vh = innerHeight, iw = innerWidth;
-  mx += (mxT - mx) * .12;  my += (myT - my) * .12;
-
-  layerFar.style.transform  = "translate(" + (-mx * 4).toFixed(1) + "px," + (sy * .05 - my * 3).toFixed(1) + "px)";
-  layerMid.style.transform  = "translate(" + (-mx * 8).toFixed(1) + "px," + (sy * .11 - my * 5).toFixed(1) + "px)";
-  layerNear.style.transform = "translate(" + (-mx * 16).toFixed(1) + "px," + (sy * .24 - my * 9).toFixed(1) + "px)";
-
-  const kd = clamp01(sy / (vh * 0.9));
-  stage.style.opacity = (1 - 0.88 * kd).toFixed(3);
-  stage.style.transform =
-    "translateX(-50%) translate(" + (mx * 10).toFixed(1) + "px," + (sy * .22 + my * 6).toFixed(1) + "px)";
-
-  const p1 = prog(sy, tops[1], vh);
-  const kx = ease(clamp01(p1 * 1.75)) * iw * 0.20;
-  const ky = ease(clamp01((p1 - .5) * 2)) * (-vh * 0.13)
-           - 46 * Math.sin(Math.PI * p1);
-  mvKnight.style.transform = "translate(" + kx.toFixed(1) + "px," + ky.toFixed(1) + "px)";
-
-  const p2 = ease(prog(sy, tops[2], vh));
-  mvBishop.style.transform = "translate(" + (p2 * iw * .09).toFixed(1) + "px," + (-p2 * vh * .12).toFixed(1) + "px)";
-
-  const p3 = prog(sy, tops[3], vh);
-  mvRook.style.transform = "translate(0px," + (ease(p3) * vh * .38).toFixed(1) + "px)";
-  const cp = ease(clamp01((p3 - .5) / .5));
-  mvPawn.style.opacity = (1 - .8 * cp).toFixed(3);
-  mvPawn.style.transform = "rotate(" + (76 * cp).toFixed(1) + "deg) translateY(" + (10 * cp).toFixed(1) + "px)";
-}
-if (!rm) {
-  addEventListener("scroll", requestApply, { passive: true });
-  apply();
-}
 })();

@@ -1,15 +1,18 @@
 /* ============================================================================
-   Firstlight — global stylesheet (the rev4 board UI).
+   Firstlight — global stylesheet (the strategy-room UI).
 
-   THE BOARD IS THE BACKGROUND: a crisp perspective chessboard (dark #0E0A07 /
-   light #4A3A26 squares, gold grid lines at 25%, gold trim edge) fixed behind
-   the whole page; only the lens inside a pane blurs what is directly behind
-   it, and only the far horizon fades. Pieces are lit like jewellery — king on
-   his plinth with the thin gold halo + sharp mid-layer pieces on screen one.
-   Text contrast = text-shadow + one soft veil under 25% (no dark bars).
-   Mobile: king above the headline, per-stock 4x2 cards, >=44px targets, <=3
-   backdrop-filter layers. Reduced motion = static position. No red, no
-   green, no horizontal scroll. Mirrors ui-mocks/hero-v2.html rev4 exactly.
+   THE ENVIRONMENT IS A CINEMATIC STRATEGY ROOM: a dark walnut table under a
+   warm key light, a large crisp perspective chessboard (dark #0E0A07 /
+   light #4A3A26 squares, gold grid lines at 25%, gold trim edge) as the
+   foundation of the page, several DIM chess pieces at far/mid depth toward
+   the edges, faint gold dust and mist, real market plates + mini gold/ivory
+   candlesticks embedded INTO the board (drawBoardData, recorder data only).
+   No hero piece — no king, no plinth, no halo. No futuristic glow, no neon,
+   no crypto-dashboard blues. The glassmorphism panes stay as they are
+   (slightly thicker now): smoked-glass displays hovering over the table.
+   Text contrast = text-shadow + one soft veil under 25%. Mobile: per-stock
+   4x2 cards, >=44px targets, <=3 backdrop-filter layers, no hero piece.
+   Reduced motion = static. No red, no green, no horizontal scroll.
    ========================================================================== */
 
   :root{
@@ -23,11 +26,16 @@
     --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
     --sqD:#0E0A07; --sqL:#4A3A26;                  /* the board's squares */
+    --navClear:82px;                               /* fixed-nav bottom + air */
     --tshadow:0 1px 2px rgba(12,9,7,.92),0 2px 8px rgba(12,9,7,.6),0 0 18px rgba(12,9,7,.4);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth}
-  html,body{background:var(--page-0)}
+  /* Background on <html> ONLY — if <body> also had one, its opaque paint
+     would cover the z-index:-1 stage (.bg: board, pieces, king). Root
+     cause of the invisible board on the live site. */
+  html{background:var(--page-0)}
+  body{background:transparent}
   body{
     font-family:var(--sans); color:var(--text);
     min-height:100vh; overflow-x:hidden;           /* never a horizontal page scroll */
@@ -36,76 +44,47 @@
 
   /* ══════════════ 1 · BACKGROUND STAGE — pieces on a glossy floor ══════════════ */
   .bg{position:fixed;inset:0;z-index:-1;overflow:hidden;
-      background:radial-gradient(130% 100% at 50% 0%,#171311 0%,var(--page-0) 62%)}
-  .bg__glow{position:absolute;width:70vw;height:70vw;left:-18vw;top:-22vh;border-radius:50%;
-    background:radial-gradient(circle,rgba(85,69,60,.4),rgba(85,69,60,0) 65%);
-    animation:drift1 52s ease-in-out infinite alternate;pointer-events:none}
-  @keyframes drift1{to{transform:translate3d(4vw,3vh,0)}}
-
-  /* THE CHESSBOARD — a real board, fully crisp. A perspective plane, fixed
-     behind the whole page; squares clearly countable from the hero downward.
-     NO blur filter ever touches the board layer — only the lens inside a
-     pane softens what is directly behind it. Dark #0E0A07 / light #4A3A26
-     squares, thin gold grid lines at 25%, gold trim edge; only the far
-     horizon fades, the nearest 70% stays at full opacity. */
-  .boardplane{position:absolute;inset:0;pointer-events:none}
-  .boardplane svg{display:block;width:100%;height:100%}
-  .bg__vignette{position:absolute;inset:0;pointer-events:none;
-    background:radial-gradient(125% 105% at 50% 22%,rgba(15,13,13,0) 62%,rgba(8,7,6,.38) 100%)}
-
-  /* depth layers: far (small, dim, soft) and mid (sharp) — behind the glass */
-  .layer{position:absolute;inset:0;pointer-events:none;will-change:transform}
-  .piece{position:absolute;will-change:transform,opacity}
-  .piece img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:2}
-  .piece svg{display:block;width:100%;height:auto;filter:drop-shadow(0 16px 22px rgba(0,0,0,.5))}
-
-  /* far layer — small, dim, soft */
-  .p-far-pawn1{left:11%;top:36%;width:min(7vw,72px);opacity:.34;filter:blur(1px)}
-  .p-far-pawn2{left:83%;top:30%;width:min(5.5vw,58px);opacity:.28;filter:blur(1.2px)}
-  .p-far-bishop{left:31%;top:33%;width:min(8vw,84px);opacity:.30;filter:blur(1.4px)}
-  .p-far-rook{left:91%;top:42%;width:min(6.5vw,70px);opacity:.26;filter:blur(1.2px)}
-  /* mid layer — SHARP, lit like jewellery, standing on the board squares */
-  .p-mid-queen{left:85%;top:40%;width:min(13vw,152px);opacity:.95}
-  .p-mid-bishop{left:10%;top:46%;width:min(11.5vw,136px);opacity:.92}
-  .p-mid-knight{left:23%;top:65%;width:min(11vw,130px);opacity:.85}
-  .p-mid-pawn{left:73%;top:69%;width:min(9.5vw,112px);opacity:.95}
-  .p-mid-rook{left:56%;top:78%;width:min(10vw,118px);opacity:.9}
-
-  /* the king — hero of the first screen, on his plinth, thin gold halo behind */
-  .stage{position:absolute;left:70%;bottom:5vh;width:min(44vw,436px);
-    transform:translateX(-50%);will-change:transform,opacity}
-  .stage__float{position:relative;animation:float 7s ease-in-out infinite}
-  @keyframes float{50%{transform:translateY(-6px)}}    /* upright — translation only */
-  .stage__halo{position:absolute;left:50%;bottom:31%;width:124%;aspect-ratio:1.02;
-    transform:translateX(-50%);border-radius:50%;z-index:1;
-    border:2.5px solid rgba(212,176,122,.68);
-    box-shadow:0 0 40px rgba(212,176,122,.3),inset 0 0 34px rgba(212,176,122,.2);opacity:1}
-  .stage__beam{position:absolute;left:50%;bottom:34%;width:150%;height:95vh;
-    transform:translateX(-50%);pointer-events:none;z-index:0}
-  .stage__img{position:absolute;left:8%;bottom:20%;width:84%;z-index:4;pointer-events:none}
-  .stage__plinth{display:block;width:100%;height:auto;position:relative;z-index:2}
-  .stage__king{position:absolute;left:50%;bottom:27%;width:44%;
-    transform:translateX(-50%);z-index:3;filter:drop-shadow(0 18px 30px rgba(0,0,0,.5))}
-
-  /* ══════════════ 2 · NEAR LAYER — above the glass, cropped, soft-focus ══════════════ */
-  .near{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden;will-change:transform}
-  .near .piece svg{filter:blur(7px) drop-shadow(0 26px 40px rgba(0,0,0,.55))}
-  .p-near-knight{left:-15%;top:47%;width:min(46vw,432px);opacity:.95}
-  .p-near-rook{left:79%;top:18%;width:min(34vw,330px);opacity:.9}
+      background:
+        radial-gradient(120% 90% at 50% -10%,rgba(212,176,122,.09),rgba(212,176,122,0) 55%),
+        linear-gradient(180deg,#1A130E 0%,#120D09 46%,#0C0906 100%)}
+  /* the photoreal strategy-room scene — fixed, behind every pane and card,
+     never inside/on a card. A failed image hides itself; the walnut
+     gradient above is the fallback, so a broken image is never shown. */
+  .bg__scene{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    object-position:50% 50%}
+  .bg__scene--m{display:none}
+  /* asymmetric scrim: the LEFT side (hero card, text) is darkened hard,
+     the RIGHT stays light so the candlestick holograms in the photo stay
+     clearly visible; top/bottom bands keep nav, ticker and footer at 4.5:1 */
+  .bg__scrim{position:absolute;inset:0;pointer-events:none;
+    background:
+      linear-gradient(90deg,rgba(8,6,4,.68) 0%,rgba(8,6,4,.48) 34%,
+        rgba(8,6,4,.20) 66%,rgba(8,6,4,.28) 100%),
+      linear-gradient(180deg,rgba(8,6,4,.44) 0%,rgba(8,6,4,.10) 22%,
+        rgba(8,6,4,.12) 60%,rgba(8,6,4,.48) 100%)}
 
   /* ══════════════ 3 · THICK GLASS — outer pane + inner lens + glare ══════════════ */
   .glass{position:relative;
-    background:rgba(255,255,255,.03);                 /* 3% white — pieces show through */
+    background:rgba(255,255,255,.045);                /* pieces show through the pane */
     -webkit-backdrop-filter:blur(6px);
     backdrop-filter:blur(6px);
-    border:1px solid var(--hairline);border-radius:24px;
-    box-shadow:0 24px 48px rgba(0,0,0,.42),
-               inset 0 1px 0 rgba(255,255,255,.10),
-               inset -1px -2px 8px rgba(0,0,0,.22)}   /* darker bottom-right inner edge */
-  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
-    background:linear-gradient(135deg,rgba(255,255,255,.32),rgba(255,255,255,.07) 30%,rgba(255,255,255,0) 55%);
+    border:1px solid rgba(255,255,255,.17);border-radius:24px;
+    box-shadow:0 26px 52px rgba(0,0,0,.5),
+               0 3px 10px rgba(0,0,0,.35),
+               inset 0 1.5px 0 rgba(255,255,255,.17), /* strong top rim highlight */
+               inset 0 -1px 0 rgba(255,255,255,.055),
+               inset 2px 2px 6px rgba(255,255,255,.03),
+               inset -2px -3px 12px rgba(0,0,0,.3)}   /* darker bottom-right inner edge */
+  .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;
+    background:linear-gradient(135deg,rgba(255,255,255,.52),rgba(255,255,255,.14) 30%,
+      rgba(255,255,255,.02) 55%,rgba(255,255,255,.16) 92%);
     -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
     -webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+  /* the thick-glass inner edge — a visible block rim inside every pane; a
+     crisp piece straddling the pane edge bends under it (backdrop blur) */
+  .pane::after{content:"";position:absolute;inset:5px;border-radius:23px;
+    border:1px solid rgba(255,255,255,.13);pointer-events:none;z-index:0;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.16),inset 0 10px 26px rgba(255,255,255,.028)}
   .glass--nav{background:rgba(255,255,255,.04);border-radius:999px}
   .pane{border-radius:28px}
   .pane__lens{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;
@@ -154,11 +133,48 @@
   .nav__links a:hover,.nav__links a:focus-visible{color:var(--text)}
   .nav__tag{font-size:10px;letter-spacing:.18em;color:var(--bronze);
     border:1px solid rgba(155,134,120,.35);border-radius:999px;padding:5px 10px;white-space:nowrap}
+  .nav__bell{appearance:none;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
+    border-radius:50%;width:42px;height:42px;min-width:42px;display:inline-flex;align-items:center;
+    justify-content:center;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+  .nav__bell svg{width:19px;height:19px;fill:none;stroke:var(--bronze);stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s}
+  .nav__bell:hover svg,.nav__bell:focus-visible svg{stroke:var(--gold)}
+  .nav__bell[aria-expanded="true"]{border-color:rgba(212,176,122,.6);
+    box-shadow:0 0 14px rgba(212,176,122,.22)}
+  .bellpop{position:fixed;top:calc(var(--navClear) + 10px);right:12px;z-index:20;width:min(340px,calc(100vw - 24px));
+    border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:16px 18px;
+    background:rgba(22,19,17,.96);box-shadow:0 24px 48px rgba(0,0,0,.5)}
+  .bellpop__t{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:8px}
+  .bellpop__x{font-size:12px;line-height:1.65;color:rgba(242,239,232,.75)}
   :is(a,button):focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+  /* ══════════════ 4b · TICKER STRIP — verdict + cost per name, never prices ══════════════ */
+  .tickerbar{position:static;z-index:9;margin:calc(var(--navClear) + 4px) auto 10px;
+    width:min(1180px,calc(100vw - 24px));
+    border:1px solid rgba(255,255,255,.14);border-radius:999px;
+    background:rgba(16,13,11,.92);padding:6px 8px}   /* solid tint — no blur budget spent */
+  .tickerbar__in{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch}
+  .tickerbar__in::-webkit-scrollbar{display:none}
+  .tk{appearance:none;flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;
+    border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.03);
+    padding:0 13px;height:32px;cursor:pointer;font-family:var(--sans);
+    text-shadow:var(--tshadow);transition:border-color .2s}
+  .tk:hover,.tk:focus-visible{border-color:rgba(212,176,122,.5)}
+  .tk b{font-family:var(--mono);font-size:11px;color:var(--text);letter-spacing:.04em}
+  .tk__g{font-size:11px;line-height:1}
+  .tk__s{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#BCA895}
+  .tk__c{font-family:var(--mono);font-size:10.5px;color:rgba(242,239,232,.75)}
+  .tk--a{border-color:rgba(212,176,122,.55)}
+  .tk--a .tk__g,.tk--a .tk__s{color:var(--gold)}
+  .tk--d .tk__g,.tk--d .tk__s{color:var(--bronze)}
+  .tk--n{border-style:dashed}
+  .tk--wait{cursor:default;border-style:dashed;color:var(--bronze);font-size:9.5px;
+    letter-spacing:.16em;text-transform:uppercase}
 
   /* ══════════════ 5 · HERO PANE ══════════════ */
   .wrap{width:min(1180px,calc(100vw - 24px));margin:0 auto}
-  .hero{padding:104px 0 7vh}
+  .hero{padding:26px 0 7vh}
   .hero__grid{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(0,.96fr);min-height:74vh}
   .hero__pane{padding:clamp(26px,3.4vw,46px);display:flex;flex-direction:column;gap:22px;
     justify-content:center;align-self:stretch;margin:clamp(14px,2vw,36px) 0}
@@ -187,10 +203,11 @@
     color:var(--bronze);vertical-align:1px;margin-right:6px}
   .callout__n{color:rgba(242,239,232,.5);font-size:11px}
   .published{font-size:12px;line-height:1.6;color:rgba(242,239,232,.66);align-self:flex-start}
-  .hero__scene{position:relative;min-height:340px}
-  .scene__chip{position:absolute;right:18px;bottom:16px;font-size:9.5px;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--bronze);border:1px solid rgba(255,255,255,.12);
-    border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.03)}
+  .kickerow{display:flex;justify-content:space-between;align-items:center;gap:12px;
+    flex-wrap:wrap;width:100%}
+  .scene__chip{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--bronze);border:1px solid rgba(255,255,255,.12);border-radius:999px;
+    padding:6px 12px;background:rgba(255,255,255,.03);white-space:nowrap}
 
   /* ══════════════ 6 · BOARD PANE ══════════════ */
   .board{padding:9vh 0 4vh}
@@ -222,7 +239,7 @@
   .chip--live .dotp{width:6px;height:6px;border-radius:50%;background:var(--gold);
     box-shadow:0 0 8px rgba(212,176,122,.8)}
   .board__scroll{overflow-x:auto;padding-bottom:6px}
-  .grid{display:grid;grid-template-columns:58px repeat(8,var(--sqw,56px));gap:6px;min-width:max-content}
+  .grid{display:grid;grid-template-columns:64px repeat(8,var(--sqw,150px));gap:8px;min-width:max-content}
   .row{display:contents}
   .hd{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--bronze);
     text-align:center;align-self:end;padding:2px 4px 4px}
@@ -230,28 +247,26 @@
     position:sticky;left:0;background:rgba(21,19,18,.85);padding:6px 8px 6px 2px;
     border-radius:8px;z-index:2;text-shadow:var(--tshadow)}
   .hd--corner{position:sticky;left:0;background:transparent;z-index:2;text-align:left;padding-left:2px}
-  .sq{--tint:rgba(255,255,255,0);width:var(--sqw);height:var(--sqw);border-radius:10px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-    border:1px solid transparent;cursor:pointer;color:var(--bronze);
-    -webkit-backdrop-filter:none;backdrop-filter:none;
-    background:linear-gradient(var(--tint),var(--tint));
-    transition:opacity .5s,transform .3s,box-shadow .25s}
+  .sq{--tint:rgba(255,255,255,0);position:relative;width:var(--sqw,150px);height:114px;
+    border-radius:14px;padding:9px 10px 8px;
+    display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:0;
+    border:1px solid rgba(212,176,122,.26);cursor:pointer;color:var(--bronze);
+    -webkit-backdrop-filter:blur(9px) saturate(1.12);backdrop-filter:blur(9px) saturate(1.12);
+    background:linear-gradient(var(--tint),var(--tint)),rgba(17,12,9,.42);
+    box-shadow:0 10px 26px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.05);
+    transition:opacity .5s,transform .3s,box-shadow .25s,border-color .25s}
   .sq .g{font-size:15px;line-height:1}
   .sq .lb{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase}
   .sq .tm{display:none;font-size:7.5px;letter-spacing:.08em;text-transform:uppercase;
     color:rgba(242,239,232,.55)}
-  .sq.alt{--tint:rgba(255,255,255,.025)}
-  .sq[data-state="a"]{
-    background:radial-gradient(circle at 50% 34%,rgba(212,176,122,.30),rgba(212,176,122,.07) 68%,var(--tint));
-    border-color:rgba(212,176,122,.55);color:var(--gold);
-    box-shadow:0 0 18px rgba(212,176,122,.18)}
-  .sq[data-state="t"]{border-color:rgba(255,255,255,.20);color:#CFC6B8;
-    background:linear-gradient(var(--tint),var(--tint))}
-  .sq[data-state="d"]{border-color:rgba(255,255,255,.07);color:var(--bronze);
-    background:linear-gradient(var(--tint),var(--tint)),rgba(255,255,255,.03)}
-  .sq[data-state="n"]{border-color:rgba(255,255,255,.14);border-style:dashed;color:rgba(155,134,120,.9);
-    background:linear-gradient(var(--tint),var(--tint))}
-  .sq:hover{transform:translateY(-2px)}
+  .sq.alt{--tint:rgba(255,255,255,.02)}
+  .sq[data-state="a"]{--tint:rgba(212,176,122,.10);
+    border-color:rgba(212,176,122,.60);color:var(--gold);
+    box-shadow:0 0 18px rgba(212,176,122,.16),0 10px 26px rgba(0,0,0,.32)}
+  .sq[data-state="t"]{border-color:rgba(242,239,232,.24);color:#CFC6B8}
+  .sq[data-state="d"]{border-color:rgba(242,239,232,.10);color:var(--bronze)}
+  .sq[data-state="n"]{border-color:rgba(242,239,232,.15);border-style:dashed;color:rgba(155,134,120,.9)}
+  .sq:hover{transform:translateY(-2px);border-color:rgba(212,176,122,.5)}
   .sq.sel{outline:2px solid var(--gold);outline-offset:2px}
   /* F · board reveal — squares light one at a time, chess-clock style */
   .sq{opacity:0;transform:translateY(6px) scale(.96)}
@@ -260,7 +275,7 @@
   .evidence{display:none;margin-top:22px;border-radius:16px;border:1px solid rgba(255,255,255,.10);
     background:rgba(255,255,255,.025);padding:18px 20px;font-size:13px;line-height:1.7}
   .evidence.open{display:block;animation:evin .35s cubic-bezier(.2,.6,.2,1)}
-  @keyframes evin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  
   .evidence__head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-bottom:10px}
   .evidence__name{font-family:var(--mono);font-size:17px}
   .evidence__block{color:rgba(242,239,232,.68);font-size:12px}
@@ -275,6 +290,96 @@
     border-top:1px solid rgba(255,255,255,.08);padding-top:10px;word-spacing:.12em}
   .board__note{margin-top:16px;font-size:11.5px;line-height:1.7;color:rgba(242,239,232,.55)}
   .board__note b{color:rgba(242,239,232,.8)}
+
+  /* ══════════════ 6b · THE MINI TRADING PANEL — gauge, tiles, split, kv,
+     charts, hand-off, why. Gold/cream/bronze only — no red, no green;
+     verdicts differ by shape, icon and label as well as tone ══════════════ */
+  .state__g{margin-right:7px}
+  .evgrid{display:grid;grid-template-columns:172px minmax(0,1fr);gap:6px 18px;
+    align-items:center;margin:14px 0 4px}
+  .evgauge .gauge{width:100%;max-width:172px;display:block}
+  .gauge__v{font-family:var(--mono);font-size:27px;fill:var(--text)}
+  .gauge__u{font-size:8px;fill:#BCA895;letter-spacing:.14em}
+  .gauge__lim{font-size:7.5px;fill:var(--gold);letter-spacing:.08em}
+  .gauge__over{font-size:7.5px;fill:#E8CBA0;letter-spacing:.12em}
+  .evtiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .evt{border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px 12px;
+    background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:3px;min-height:76px}
+  .evt--nd{border-style:dashed}
+  .evt__l{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--bronze)}
+  .evt__v{font-family:var(--mono);font-size:19px;color:var(--text)}
+  .evt__v i{font-style:normal;font-size:11px;color:#BCA895}
+  .evt__s{font-size:10px;color:rgba(242,239,232,.6);line-height:1.45}
+  .evsplit{margin-top:12px}
+  .evsplit__bar{display:flex;height:16px;border-radius:8px;overflow:hidden;
+    border:1px solid rgba(255,255,255,.12)}
+  .evsplit__seg{display:flex;align-items:center;justify-content:center;overflow:hidden;
+    white-space:nowrap;font:600 8.5px/1 var(--sans);letter-spacing:.08em;color:#14100C;
+    text-transform:uppercase;min-width:0}
+  .evsplit__seg--perp{background:linear-gradient(90deg,rgba(212,176,122,.95),rgba(212,176,122,.65))}
+  .evsplit__seg--spot{background:linear-gradient(90deg,rgba(232,220,200,.75),rgba(232,220,200,.45))}
+  .evsplit__cap{display:block;margin-top:6px;font-size:10px;line-height:1.5;color:rgba(242,239,232,.6)}
+  .evsplit--nd{font-size:11px;color:rgba(242,239,232,.55);border:1px dashed rgba(255,255,255,.14);
+    border-radius:10px;padding:12px}
+  .evkv{margin-top:14px}
+  .kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .kv__k{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--bronze);
+    white-space:nowrap}
+  .kv__v{font-family:var(--mono);font-size:12px;color:var(--text);text-align:right}
+  .evwhy{margin-top:14px;font-size:12.5px;line-height:1.65;color:rgba(242,239,232,.82);
+    border-left:2px solid rgba(212,176,122,.5);padding-left:12px}
+  .evwhy b{color:var(--gold);letter-spacing:.08em}
+  .evwhy__codes{margin-top:6px;font-family:var(--mono);font-size:10px;
+    color:rgba(242,239,232,.45);letter-spacing:.04em}
+  .evchart,.evact{margin-top:16px}
+  .evchart__svg,.evact__svg{width:100%;height:auto;display:block}
+  .evchart__axis{stroke:rgba(255,255,255,.16);stroke-width:1}
+  .evchart__lim--perp{stroke:rgba(212,176,122,.5);stroke-width:1;stroke-dasharray:4 4}
+  .evchart__lim--spot{stroke:rgba(232,220,200,.4);stroke-width:1;stroke-dasharray:4 4}
+  .evchart__limt{font-size:8px;fill:#BCA895;font-family:var(--mono)}
+  .evchart__line--perp{fill:none;stroke:var(--gold);stroke-width:2;stroke-linejoin:round}
+  .evchart__line--spot{fill:none;stroke:#E5D9C4;stroke-width:1.6;stroke-dasharray:1 4;
+    stroke-linecap:round}
+  .evchart__dot{stroke:none}
+  .evchart__dot--perp{fill:var(--gold)}
+  .evchart__dot--spot{fill:#E5D9C4}
+  .evchart__dot--sel{stroke:var(--text);stroke-width:1.4}
+  .evchart__sel{stroke:rgba(255,255,255,.22);stroke-width:1}
+  .evchart__xl{font-size:7.5px;fill:#BCA895;letter-spacing:.05em}
+  .evchart__cap,.evact__cap{display:block;margin-top:6px;font-size:10px;line-height:1.5;
+    color:rgba(242,239,232,.55)}
+  .evact__b--perp{fill:rgba(212,176,122,.85)}
+  .evact__b--spot{fill:rgba(229,217,196,.6)}
+  .evact__b--cap{fill-opacity:.5;stroke:rgba(255,255,255,.4);stroke-width:.6;stroke-dasharray:2 2}
+  .evact__n{font-size:7px;fill:#BCA895;font-family:var(--mono)}
+  .evchart__nd,.evact__nd{font-size:11px;color:rgba(242,239,232,.55);
+    border:1px dashed rgba(255,255,255,.14);border-radius:10px;padding:14px;text-align:center}
+  .evhandoff{margin-top:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+  .bitgetbtn{display:inline-flex;align-items:center;gap:8px;min-height:44px;
+    font:600 11.5px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;
+    color:#14100C;background:linear-gradient(135deg,#E8CBA0,#B48F5F);
+    border-radius:999px;padding:14px 22px;text-decoration:none;
+    transition:box-shadow .25s,transform .25s}
+  .bitgetbtn:hover,.bitgetbtn:focus-visible{box-shadow:0 0 26px rgba(212,176,122,.35);
+    transform:translateY(-1px)}
+  .evhandoff__x{font-size:10.5px;line-height:1.6;color:rgba(242,239,232,.6)}
+  .evhandoff--nd{font-size:11px;color:rgba(242,239,232,.55);border:1px dashed rgba(255,255,255,.14);
+    border-radius:10px;padding:12px}
+  .whysec{margin-top:16px}
+  .whybtn{appearance:none;background:rgba(212,176,122,.08);border:1px solid rgba(212,176,122,.45);
+    color:var(--gold);border-radius:999px;padding:13px 20px;min-height:44px;
+    font:600 11px/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;cursor:pointer;
+    text-shadow:var(--tshadow);transition:background .2s,box-shadow .2s}
+  .whybtn:hover,.whybtn:focus-visible{background:rgba(212,176,122,.14);
+    box-shadow:0 0 18px rgba(212,176,122,.2)}
+  .whyout{margin-top:12px;border:1px solid rgba(255,255,255,.10);border-radius:14px;
+    padding:14px 16px;background:rgba(255,255,255,.03)}
+  .whyout__t{font-size:13px;line-height:1.7;color:var(--text)}
+  .whyout__load{font-size:12px;color:rgba(242,239,232,.6)}
+  .whyout__src{margin-top:8px;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--bronze)}
+  .whyout__f{margin-top:6px;font-size:10px;line-height:1.6;color:rgba(242,239,232,.5)}
 
   /* ══════════════ 7 · HOW-IT-WORKS PANE ══════════════ */
   .how{padding:5vh 0 4vh}
@@ -316,32 +421,24 @@
     :root{--sqw:46px}
     .nav{padding:11px 16px}
     .nav__links{display:none}
-    .hero{padding-top:88px}
+    .hero{padding-top:18px}
     .hero__grid{grid-template-columns:1fr;min-height:0}
-    .hero__scene{min-height:44vh}
-    .stage{left:50%;bottom:15vh;width:min(72vw,340px)}
-    .p-mid-queen{left:84%;top:38%}
-    .p-mid-rook{left:54%;top:76%}
     .steps{grid-template-columns:1fr}
   }
 
   /* ══════════════ 11 · MOBILE (<640px) — king above headline, 4x2 cards ══════════════ */
   @media (max-width:639.98px){
-    .hero{padding-top:84px}
+    :root{--navClear:84px}
+    .hero{padding-top:14px}
     .hero__grid{display:flex;flex-direction:column}
-    .hero__scene{order:-1;min-height:36vh}       /* the king, above the headline */
-    .stage{left:50%;bottom:auto;top:20vh;width:min(64vw,300px)}
-    .hero__pane{margin:0}
-    .scene__chip{right:12px;bottom:10px}
-    .near .piece svg{filter:blur(4px) drop-shadow(0 20px 30px rgba(0,0,0,.5))}
-    .p-near-knight{left:-30%;top:56%;width:64vw;opacity:.55}
-    .p-near-rook{left:74%;top:12%;width:52vw;opacity:.5}
-    .p-far-pawn1,.p-far-pawn2,.p-mid-knight{display:none}
-    .p-far-bishop{left:24%;top:9%}
-    .p-mid-queen{left:80%;top:28%;width:26vw;opacity:.95}
-    .p-mid-bishop{left:3%;top:44%;width:27vw;opacity:.85}
-    .p-mid-pawn{left:72%;top:66%;width:23vw;opacity:.95}
-    .p-mid-rook{left:40%;top:84%;width:22vw;opacity:.9}
+    .hero__pane{margin:0;padding:22px 18px;gap:15px}
+    .headline{font-size:clamp(30px,8.4vw,38px)}
+    .lede{font-size:14px}
+    .cta{padding:12px 20px}
+    .callouts{gap:11px}
+    .callout{padding:10px 12px;gap:10px}
+    .callout__value{font-size:20px}
+    .scene__chip{right:12px;bottom:8px}
     /* blur budget: only nav + hero pane + board pane keep backdrop-filter */
     #how .pane,#honesty .pane{
       -webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.022)}
@@ -363,8 +460,18 @@
     .sq .tm{display:block}
     .sq .g{font-size:14px}
     .sq .lb{font-size:7.5px}
-    .evidence{padding:16px 14px}
+    .evidence{padding:16px 12px}
     .how__panel,.honesty__panel{padding:18px 16px}
+    /* the trading panel on the phone: gauge above, tiles 2×2, charts fit */
+    .tickerbar{padding:4px 6px}
+    .tk{height:44px;padding:0 14px}
+    .tk--wait{height:36px}
+    .evgrid{grid-template-columns:1fr}
+    .evgauge .gauge{max-width:190px;margin:0 auto}
+    .evsplit__cap,.evchart__cap,.evact__cap{font-size:9.5px}
+    .bitgetbtn{width:100%;justify-content:center}
+    .whybtn{width:100%}
+    .bellpop{right:8px}
   }
 
   /* ══════════════ 12 · REDUCED MOTION — a static position ══════════════ */
@@ -373,5 +480,56 @@
     *,*::before,*::after{animation:none!important;transition:none!important}
     .reveal{opacity:1!important;transform:none!important}
     .sq{opacity:1!important;transform:none!important}
-    .stage__float{animation:none}
+  }
+
+  /* ══════════════════════════════════════════════════════════════════════
+     REV7 · GLASS CARDS OVER THE PHOTO — the board is a grid of translucent
+     smoked-glass cards (one per hour per instrument) floating above the
+     photoreal strategy-room scene. Each card: ticker · px · close line ·
+     bp · verdict. Phone: same cards, flat 4-across, NO backdrop-filter
+     (blur budget: nav + hero pane + board pane only). No pieces on cards.
+     ══════════════════════════════════════════════════════════════════════ */
+  .sq .g{font-size:10px}
+  .sq .lb{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase}
+  .sq__top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .sq__nm{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
+    color:#EFE9DC;font-weight:700;text-shadow:var(--tshadow)}
+  .sq__px{font-family:var(--mono);font-size:11px;color:rgba(242,239,232,.85);
+    white-space:nowrap;text-shadow:var(--tshadow)}
+  .sq__chart{display:block;width:100%;height:30px;margin:5px 0 4px}
+  .sq__chart--none{border-top:1px dashed rgba(242,239,232,.18);height:29px}
+  .sq__bot{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .sq__bp{font-family:var(--mono);font-size:10.5px;color:#D4B07A;white-space:nowrap;
+    text-shadow:var(--tshadow)}
+  .sq__vd{font-size:8px;letter-spacing:.09em;text-transform:uppercase;
+    white-space:nowrap;color:#BCA895}
+  .sq__vd .g{font-size:10px;line-height:1;margin-right:3px}
+  .sq[data-state="a"] .sq__vd,.sq[data-state="t"] .sq__vd{color:#CFC6B8}
+  .sq .tm{display:none}
+  .board__scroll{overflow-x:auto;padding:6px 0 10px}
+
+  @media (max-width:840px){
+    .bg__scene--d{display:none}
+    .bg__scene--m{display:block}
+  }
+  @media (max-width:639.98px){
+    .grid{display:flex;flex-direction:column;gap:12px;min-width:0}
+    .row{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+    .hd{display:none}
+    .nm{position:static;background:transparent;padding:2px 2px 8px;font-size:14px}
+    .sq{width:auto;height:auto;min-height:104px;padding:7px 8px 6px;
+      /* blur budget: cards lose their blur on phone — nav + hero pane +
+         board pane are the only backdrop-filters left */
+      -webkit-backdrop-filter:none;backdrop-filter:none;
+      background:linear-gradient(var(--tint),var(--tint)),rgba(15,11,8,.66)}
+    .sq__nm{font-size:11px}
+    .sq__px{font-size:10px}
+    .sq__chart{height:26px;margin:4px 0 3px}
+    .sq__bp{font-size:9.5px}
+    .sq__vd{font-size:7.5px}
+    .sq .tm{display:block;font-size:7px;position:absolute;top:5px;right:7px;
+      color:rgba(242,239,232,.55)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .sq,.sq:hover{transition:none}
   }
