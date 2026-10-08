@@ -25,13 +25,13 @@
 // ============================================================================
 
 import { NextResponse } from "next/server";
-import { rest, restMutate } from "../../../../lib/supabase.js";
-import { sendMessage } from "../../../../lib/telegram.js";
+import { rest, restMutate } from "../../../../../lib/supabase.js";
+import { sendMessage } from "../../../../../lib/telegram.js";
 import {
   etClock, pickLiveView, statusChanged, subLine, usd,
   templateAlertText, alertSystemPrompt, briefText,
-} from "../../../../lib/alerts.js";
-import { boardFacts, factLine } from "../../../../lib/alertsend.js";
+} from "../../../../../lib/alerts.js";
+import { boardFacts, factLine } from "../../../../../lib/alertsend.js";
 
 export const dynamic = "force-dynamic";
 
