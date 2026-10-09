@@ -23,6 +23,7 @@ import { NAMES } from "../../../lib/engine.js";
 import { evidenceSummary, narrateTemplate, systemPrompt, WHY_FOOTER } from "../../../lib/why.js";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET(request) {
   const sp = new URL(request.url).searchParams;
@@ -54,40 +55,44 @@ export async function GET(request) {
   }
 
   // 1 · the model, when a key is configured
-  const key = process.env.WHY_API_KEY;
+  const key = String(process.env.WHY_API_KEY || "").trim().replace(/^["']|["']$/g, "");
+  let reason = key ? "" : "WHY_API_KEY not set in this deployment";
   if (key) {
     try {
-      const url = process.env.WHY_API_URL ||
-        "https://api.openai.com/v1/chat/completions";
+      let url = String(process.env.WHY_API_URL || "https://api.openai.com/v1/chat/completions").trim();
+      if (!/\/chat\/completions\/?$/.test(url)) url = url.replace(/\/+$/, "") + "/chat/completions";
+      const isGroq = url.includes("groq.com");
+      const model = String(process.env.WHY_MODEL || (isGroq ? "llama-3.3-70b-versatile" : "gpt-4o-mini")).trim();
       const r = await fetch(url, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: "Bearer " + key,
-        },
+        headers: { "content-type": "application/json", authorization: "Bearer " + key },
         body: JSON.stringify({
-          model: process.env.WHY_MODEL || "gpt-4o-mini",
+          model,
           temperature: 0,
-          max_tokens: 220,
+          max_tokens: 260,
           messages: [
             { role: "system", content: systemPrompt() },
             { role: "user", content: JSON.stringify(ev) },
           ],
         }),
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(9000),
       });
-      const j = await r.json();
+      const raw = await r.text();
+      let j = null; try { j = JSON.parse(raw); } catch (e) {}
       let text = j && j.choices && j.choices[0] &&
         j.choices[0].message && String(j.choices[0].message.content || "").trim();
       if (text) {
-        if (text.length > 700) text = text.slice(0, 700).trimEnd() + "…";
-        return NextResponse.json({ source: "model", text, footer: WHY_FOOTER });
+        if (text.length > 900) text = text.slice(0, 900).trimEnd() + "…";
+        return NextResponse.json({ source: "model", model, text, footer: WHY_FOOTER });
       }
+      reason = "provider HTTP " + r.status + " · model " + model + " · " +
+        ((j && j.error && (j.error.message || j.error)) || raw || "empty reply").toString().slice(0, 200);
     } catch (e) {
-      // fall through to the deterministic narrator — never fail the panel
+      reason = "call failed: " + String(e && e.message || e).slice(0, 160);
     }
   }
+  const debug = new URL(request.url).searchParams.get("debug") === "1";
 
   // 2 · the built-in narrator (always available)
-  return NextResponse.json({ source: "template", text: narrateTemplate(ev), footer: WHY_FOOTER });
+  return NextResponse.json({ source: "template", text: narrateTemplate(ev), footer: WHY_FOOTER, ...(debug ? { reason } : {}) });
 }
