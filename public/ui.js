@@ -657,7 +657,7 @@ function showEvidence(name, col) {
       whyOut.innerHTML =
         '<p class="whyout__t">' + esc(j && j.text ? j.text : "no data") + '</p>' +
         '<p class="whyout__src">source: ' + (j && j.source === "model"
-          ? "LLM · evidence-locked" : "built-in narrator · deterministic") + '</p>' +
+          ? "LLM · " + (j.model || "model") + " · evidence-locked" : "built-in narrator · deterministic") + '</p>' +
         (j && j.footer ? '<p class="whyout__f">' + esc(j.footer) + '</p>' : "");
     } catch (e) {
       whyOut.innerHTML = '<p class="whyout__t">no data — the explanation service is unreachable right now.</p>';
@@ -877,8 +877,14 @@ if (rm || !("IntersectionObserver" in window)) {
         io.unobserve(en.target);
       }
     });
-  }, { threshold: .15, rootMargin: "0px 0px -40px 0px" });
+  }, { threshold: 0, rootMargin: "0px 0px -8% 0px" });
   revs.forEach((el) => io.observe(el));
+  /* safety net: nothing may stay invisible if the observer is slow or never fires */
+  setTimeout(() => {
+    revs.forEach((el) => el.classList.add("in"));
+    if (!boardSeen) { boardSeen = true; lightSquares(); }
+    grid.querySelectorAll(".sq:not(.lit)").forEach((q) => q.classList.add("lit"));
+  }, 2200);
 }
 
 })();
