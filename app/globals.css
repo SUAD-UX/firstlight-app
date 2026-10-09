@@ -122,7 +122,7 @@
 
   /* ══════════════ 4 · NAV ══════════════ */
   .nav{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10;
-    width:min(1180px,calc(100vw - 24px));
+    width:min(1180px,calc(100% - 24px));max-width:calc(100% - 24px);box-sizing:border-box;overflow:hidden;
     display:flex;align-items:center;justify-content:space-between;gap:16px;
     padding:12px 22px}
   .nav__word{font-size:12px;letter-spacing:.24em;font-weight:600;color:var(--text)}
@@ -478,6 +478,13 @@
     .bitgetbtn{width:100%;justify-content:center}
     .whybtn{width:100%}
     .bellpop{right:8px}
+  }
+
+  @media (max-width:420px){
+    .nav{gap:8px;padding:9px 12px}
+    .nav__word{font-size:11px;letter-spacing:.16em;min-width:0}
+    .nav__tag{font-size:8.5px;letter-spacing:.08em;padding:4px 8px;flex-shrink:1;min-width:0;
+      overflow:hidden;text-overflow:ellipsis}
   }
 
   /* ══════════════ 12 · REDUCED MOTION — a static position ══════════════ */
