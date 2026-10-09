@@ -379,18 +379,26 @@ function buildGrid(names, blocks) {
     grid.appendChild(row);
   });
 
-  if (boardSeen) lightSquares();
+  /* first reveal staggers; later rebuilds (live data arriving) never hide the cards again */
+  if (boardSeen) {
+    if (revealedOnce) grid.querySelectorAll(".sq").forEach((q) => {
+      q.classList.add("lit"); if (q.dataset.state === "a") q.classList.add("glow");
+    });
+    else lightSquares();
+  }
 }
 
 /* chess-clock reveal — column by column, ACTIONABLE glow last */
 const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let revealedOnce = false;
 function lightSquares() {
+  revealedOnce = true;
   const squares = [...grid.querySelectorAll(".sq")];
   if (rm) { squares.forEach((s) => s.classList.add("lit")); return; }
   squares.forEach((s) => {
     const r = Math.max(0, namesOrder.indexOf(s.dataset.name));
     const c = +s.dataset.col;
-    const d = (c * 5 + r) * 65;               /* one column at a time */
+    const d = (c * 2 + r) * 28;               /* quick sweep, under a second */
     setTimeout(() => s.classList.add("lit"), d);
     if (s.dataset.state === "a")
       setTimeout(() => s.classList.add("glow"), d + 380);
