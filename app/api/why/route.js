@@ -58,37 +58,48 @@ export async function GET(request) {
   const key = String(process.env.WHY_API_KEY || "").trim().replace(/^["']|["']$/g, "");
   let reason = key ? "" : "WHY_API_KEY not set in this deployment";
   if (key) {
-    try {
-      let url = String(process.env.WHY_API_URL || "https://api.openai.com/v1/chat/completions").trim();
-      if (!/\/chat\/completions\/?$/.test(url)) url = url.replace(/\/+$/, "") + "/chat/completions";
-      const isGroq = url.includes("groq.com");
-      const model = String(process.env.WHY_MODEL || (isGroq ? "llama-3.3-70b-versatile" : "gpt-4o-mini")).trim();
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer " + key },
-        body: JSON.stringify({
-          model,
-          temperature: 0,
-          max_tokens: 260,
-          messages: [
-            { role: "system", content: systemPrompt() },
-            { role: "user", content: JSON.stringify(ev) },
-          ],
-        }),
-        signal: AbortSignal.timeout(9000),
-      });
-      const raw = await r.text();
-      let j = null; try { j = JSON.parse(raw); } catch (e) {}
-      let text = j && j.choices && j.choices[0] &&
-        j.choices[0].message && String(j.choices[0].message.content || "").trim();
-      if (text) {
-        if (text.length > 900) text = text.slice(0, 900).trimEnd() + "…";
-        return NextResponse.json({ source: "model", model, text, footer: WHY_FOOTER });
+    let url = String(process.env.WHY_API_URL || "https://api.openai.com/v1/chat/completions").trim();
+    if (!/\/chat\/completions\/?$/.test(url)) url = url.replace(/\/+$/, "") + "/chat/completions";
+    const isGroq = url.includes("groq.com");
+    // Groq retired llama-3.3-70b-versatile on free accounts (Aug 2026) — if the configured
+    // model is gone (404), fall through to current production models instead of failing.
+    const wanted = String(process.env.WHY_MODEL || "").trim();
+    const models = [wanted || (isGroq ? "openai/gpt-oss-120b" : "gpt-4o-mini")];
+    if (isGroq) for (const m of ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]) if (!models.includes(m)) models.push(m);
+    for (const model of models) {
+      try {
+        const reasoning = /gpt-oss/.test(model);
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: "Bearer " + key },
+          body: JSON.stringify({
+            model,
+            temperature: 0,
+            // reasoning models spend completion tokens thinking — leave room for the answer
+            max_tokens: reasoning ? 900 : 260,
+            ...(reasoning ? { reasoning_effort: "low" } : {}),
+            messages: [
+              { role: "system", content: systemPrompt() },
+              { role: "user", content: JSON.stringify(ev) },
+            ],
+          }),
+          signal: AbortSignal.timeout(9000),
+        });
+        const raw = await r.text();
+        let j = null; try { j = JSON.parse(raw); } catch (e) {}
+        let text = j && j.choices && j.choices[0] &&
+          j.choices[0].message && String(j.choices[0].message.content || "").trim();
+        if (text) {
+          if (text.length > 900) text = text.slice(0, 900).trimEnd() + "…";
+          return NextResponse.json({ source: "model", model, text, footer: WHY_FOOTER });
+        }
+        reason = "provider HTTP " + r.status + " · model " + model + " · " +
+          ((j && j.error && (j.error.message || j.error)) || raw || "empty reply").toString().slice(0, 200);
+        if (r.status !== 404 && r.status !== 400) break;   // key/rate/server problems: don't hammer other models
+      } catch (e) {
+        reason = "call failed: " + String(e && e.message || e).slice(0, 160);
+        break;
       }
-      reason = "provider HTTP " + r.status + " · model " + model + " · " +
-        ((j && j.error && (j.error.message || j.error)) || raw || "empty reply").toString().slice(0, 200);
-    } catch (e) {
-      reason = "call failed: " + String(e && e.message || e).slice(0, 160);
     }
   }
   const debug = new URL(request.url).searchParams.get("debug") === "1";

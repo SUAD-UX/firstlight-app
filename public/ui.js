@@ -379,29 +379,43 @@ function buildGrid(names, blocks) {
     grid.appendChild(row);
   });
 
-  /* first reveal staggers; later rebuilds (live data arriving) never hide the cards again */
-  if (boardSeen) {
-    if (revealedOnce) grid.querySelectorAll(".sq").forEach((q) => {
-      q.classList.add("lit"); if (q.dataset.state === "a") q.classList.add("glow");
-    });
-    else lightSquares();
-  }
+  /* cards reveal as they scroll into view; a data refresh never re-hides cards already shown */
+  if (boardSeen) lightSquares();
 }
 
-/* chess-clock reveal — column by column, ACTIONABLE glow last */
+/* scroll reveal — each card fades/rises as it enters the screen, a quick sweep across the row */
 const rm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let revealedOnce = false;
+let sqIO = null;
+const seenSq = new Set();
+function showSq(s) {
+  /* reveal the whole instrument row at once (a quick sweep) — cards clipped by the
+     board's sideways scroll never count as "visible", so they must ride with their row */
+  grid.querySelectorAll('.sq[data-name="' + s.dataset.name + '"]').forEach((q) => {
+    const key = q.dataset.name + ":" + q.dataset.col;
+    if (seenSq.has(key)) return;
+    seenSq.add(key);
+    const c = +q.dataset.col || 0;
+    setTimeout(() => {
+      q.classList.add("lit");
+      if (q.dataset.state === "a") setTimeout(() => q.classList.add("glow"), 380);
+    }, c * 45);
+  });
+}
 function lightSquares() {
-  revealedOnce = true;
   const squares = [...grid.querySelectorAll(".sq")];
-  if (rm) { squares.forEach((s) => s.classList.add("lit")); return; }
+  if (sqIO) { sqIO.disconnect(); sqIO = null; }
+  if (rm || !("IntersectionObserver" in window)) { squares.forEach((s) => s.classList.add("lit")); return; }
+  sqIO = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      showSq(en.target);
+      sqIO.unobserve(en.target);
+    });
+  }, { threshold: 0, rootMargin: "0px 0px -7% 0px" });
   squares.forEach((s) => {
-    const r = Math.max(0, namesOrder.indexOf(s.dataset.name));
-    const c = +s.dataset.col;
-    const d = (c * 2 + r) * 28;               /* quick sweep, under a second */
-    setTimeout(() => s.classList.add("lit"), d);
-    if (s.dataset.state === "a")
-      setTimeout(() => s.classList.add("glow"), d + 380);
+    if (seenSq.has(s.dataset.name + ":" + s.dataset.col)) {   /* already revealed: stay visible */
+      s.classList.add("lit"); if (s.dataset.state === "a") s.classList.add("glow");
+    } else sqIO.observe(s);
   });
 }
 
@@ -887,12 +901,6 @@ if (rm || !("IntersectionObserver" in window)) {
     });
   }, { threshold: 0, rootMargin: "0px 0px -8% 0px" });
   revs.forEach((el) => io.observe(el));
-  /* safety net: nothing may stay invisible if the observer is slow or never fires */
-  setTimeout(() => {
-    revs.forEach((el) => el.classList.add("in"));
-    if (!boardSeen) { boardSeen = true; lightSquares(); }
-    grid.querySelectorAll(".sq:not(.lit)").forEach((q) => q.classList.add("lit"));
-  }, 2200);
 }
 
 })();
